@@ -1,0 +1,89 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Helper function to check if user is admin
+    function isAdmin() {
+      return request.auth != null && 
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+    
+    // Users collection
+    match /users/{userId} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null && request.auth.uid == userId;
+      allow update: if request.auth != null && 
+        (request.auth.uid == userId || isAdmin());
+      allow delete: if isAdmin();
+    }
+    
+    // Courses collection
+    match /courses/{courseId} {
+      allow read: if request.auth != null;
+      allow write: if isAdmin();
+    }
+
+    // Modules collection (used for Subjects)
+    match /modules/{moduleId} {
+      allow read: if request.auth != null;
+      allow create: if isAdmin();
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // Lessons collection
+    match /lessons/{lessonId} {
+      allow read: if request.auth != null;
+      allow write: if isAdmin();
+    }
+
+    // Projects collection
+    match /projects/{projectId} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null;
+      // Allow owner/admin to update anything, or any user to update upvotes/upvotedUsers/comments count
+      allow update: if request.auth != null && (
+        // Owner or admin can update anything
+        (request.auth.uid == resource.data.userId || isAdmin()) ||
+        // Any authenticated user can update upvotes, upvotedUsers, comments, and updatedAt
+        (
+          request.resource.data.upvotes is int &&
+          request.resource.data.upvotedUsers is list &&
+          request.resource.data.comments is int &&
+          request.resource.data.userId == resource.data.userId &&
+          request.resource.data.title == resource.data.title &&
+          request.resource.data.description == resource.data.description
+        )
+      );
+      allow delete: if request.auth != null &&
+        (request.auth.uid == resource.data.userId || isAdmin());
+      
+      // Comments subcollection
+      match /comments/{commentId} {
+        allow read: if request.auth != null;
+        allow create: if request.auth != null;
+        allow update, delete: if request.auth != null &&
+          (request.auth.uid == resource.data.userId || isAdmin());
+      }
+    }
+    
+    // Quizzes collection
+    match /quizzes/{quizId} {
+      allow read: if request.auth != null;
+      allow write: if isAdmin();
+    }
+    
+    // Practice Tests collection
+    match /practiceTests/{testId} {
+      allow read: if request.auth != null;
+      allow write: if isAdmin();
+    }
+    
+    // FAQ collection
+    match /faq/{faqId} {
+      allow read: if request.auth != null;
+      allow write: if isAdmin();
+    }
+  }
+}
+
+
