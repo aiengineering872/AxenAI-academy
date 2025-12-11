@@ -3,8 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { motion } from 'framer-motion';
-import { FileText, Clock, CheckCircle, XCircle, BarChart3 } from 'lucide-react';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { FileText, Clock, CheckCircle, XCircle, ArrowLeft } from 'lucide-react';
 import { adminService } from '@/lib/services/adminService';
 
 interface Question {
@@ -30,135 +29,99 @@ export default function PracticeTestsPage() {
   const [answers, setAnswers] = useState<Record<string, number>>({});
   const [testStarted, setTestStarted] = useState(false);
   const [testCompleted, setTestCompleted] = useState(false);
-  const [timeRemaining, setTimeRemaining] = useState(0);
   const [results, setResults] = useState<any>(null);
-  const [timerInterval, setTimerInterval] = useState<NodeJS.Timeout | null>(null);
   const [courses, setCourses] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [practiceTestsInfo, setPracticeTestsInfo] = useState<Record<string, any>>({});
+  const [startingTest, setStartingTest] = useState<string | null>(null);
 
-  // Fetch courses for practice tests
+  // Fetch courses & tests info
   useEffect(() => {
     const loadCourses = async () => {
       try {
         setLoading(true);
         const allCourses = await adminService.getCourses();
-        // Show only first 2 courses
-        setCourses(allCourses.slice(0, 2));
+        setCourses(allCourses);
+
+        const testsInfo: Record<string, any> = {};
+        for (const course of allCourses) {
+          try {
+            const testData: any = await adminService.getPracticeTest(course.id);
+            if (
+              testData &&
+              Array.isArray(testData.questions) &&
+              testData.questions.length > 0
+            ) {
+              testsInfo[course.id] = {
+                difficulty: testData.difficulty || 'beginner',
+                duration: testData.duration || 30,
+                questionCount: testData.questions.length,
+                title: testData.title || (course as any).title || 'Practice Test',
+                description: testData.description || '',
+              };
+            }
+          } catch {
+            console.log(`No practice test found for course ${course.id}`);
+          }
+        }
+        setPracticeTestsInfo(testsInfo);
       } catch (error) {
         console.error('Error loading courses:', error);
-        setCourses([]);
       } finally {
         setLoading(false);
       }
     };
+
     loadCourses();
   }, []);
 
-  const tests: Test[] = [
-    {
-      id: '1',
-      title: 'Machine Learning Fundamentals',
-      description: 'Test your knowledge of ML basics',
-      duration: 30,
-      difficulty: 'beginner',
-      questions: [
-        {
-          id: '1',
-          question: 'What is supervised learning?',
-          options: [
-            'Learning with labeled data',
-            'Learning without data',
-            'Learning with unlabeled data',
-            'Learning from rewards',
-          ],
-          correctAnswer: 0,
-          explanation: 'Supervised learning uses labeled data to train models. The algorithm learns from input-output pairs to make predictions on new data.',
-        },
-        {
-          id: '2',
-          question: 'What is the purpose of a validation set?',
-          options: [
-            'To train the model',
-            'To test the final model',
-            'To tune hyperparameters',
-            'To store data',
-          ],
-          correctAnswer: 2,
-          explanation: 'Validation set is used to tune hyperparameters and prevent overfitting. It helps select the best model configuration before final testing.',
-        },
-        {
-          id: '3',
-          question: 'What is overfitting?',
-          options: [
-            'Model performs well on training and test data',
-            'Model performs poorly on all data',
-            'Model memorizes training data but fails on new data',
-            'Model trains too slowly',
-          ],
-          correctAnswer: 2,
-          explanation: 'Overfitting occurs when a model learns the training data too well, including noise, and fails to generalize to new, unseen data.',
-        },
-      ],
-    },
-    {
-      id: '2',
-      title: 'Deep Learning Concepts',
-      description: 'Advanced questions on neural networks',
-      duration: 45,
-      difficulty: 'intermediate',
-      questions: [
-        {
-          id: '1',
-          question: 'What is the purpose of dropout in neural networks?',
-          options: [
-            'To increase model complexity',
-            'To prevent overfitting',
-            'To speed up training',
-            'To reduce memory usage',
-          ],
-          correctAnswer: 1,
-          explanation: 'Dropout is a regularization technique that randomly sets some neurons to zero during training, preventing overfitting by reducing co-adaptation of neurons.',
-        },
-        {
-          id: '2',
-          question: 'What is backpropagation?',
-          options: [
-            'Forward pass through the network',
-            'Algorithm to update weights using gradient descent',
-            'Data preprocessing technique',
-            'Model evaluation method',
-          ],
-          correctAnswer: 1,
-          explanation: 'Backpropagation is the algorithm used to calculate gradients and update neural network weights during training using the chain rule of calculus.',
-        },
-      ],
-    },
-  ];
-
   const startTest = async (courseId: string) => {
     try {
-      // Fetch practice test for the course from Firebase
+      setStartingTest(courseId);
       const testData: any = await adminService.getPracticeTest(courseId);
-      
-      if (!testData || !testData.questions || testData.questions.length === 0) {
-        alert('Practice test not available for this course. Please contact admin.');
+
+      if (!testData || !Array.isArray(testData.questions) || testData.questions.length === 0) {
+        console.log('Practice test not available for this course');
+        setStartingTest(null);
         return;
       }
 
-      // Convert Firebase test data to Test format
+      const formattedQuestions: Question[] = testData.questions
+        .map((q: any, index: number) => {
+          const questionText = q.question || q.prompt || '';
+          let options = Array.isArray(q.options) ? q.options : [];
+          options = options.filter((opt: any) => opt && String(opt).trim().length > 0);
+
+          const correctAnswer = q.correctAnswer !== undefined
+            ? q.correctAnswer
+            : (q.correctOptionIndex !== undefined ? q.correctOptionIndex : 0);
+
+          const validCorrectAnswer =
+            options.length > 0 ? Math.max(0, Math.min(correctAnswer, options.length - 1)) : 0;
+
+          return {
+            id: q.id || `q-${index}`,
+            question: questionText,
+            options,
+            correctAnswer: validCorrectAnswer,
+            explanation: q.explanation || '',
+          };
+        })
+        .filter((q: Question) => q.question && q.options.length >= 2);
+
+      if (formattedQuestions.length === 0) {
+        console.log('No valid questions found in this practice test');
+        setStartingTest(null);
+        return;
+      }
+
       const test: Test = {
         id: testData.id || courseId,
         title: testData.title || 'Practice Test',
         description: testData.description || 'Test your knowledge',
         duration: testData.duration || 30,
         difficulty: testData.difficulty || 'beginner',
-        questions: testData.questions.map((q: any, index: number) => ({
-          id: q.id || `q-${index}`,
-          question: q.question || q.prompt || '',
-          options: q.options || [],
-          correctAnswer: q.correctAnswer ?? q.correctOptionIndex ?? 0,
-          explanation: q.explanation || '',
-        })),
+        questions: formattedQuestions,
       };
 
       setSelectedTest(test);
@@ -166,40 +129,16 @@ export default function PracticeTestsPage() {
       setTestCompleted(false);
       setCurrentQuestionIndex(0);
       setAnswers({});
-      setTimeRemaining(test.duration * 60);
       setResults(null);
-
-      // Timer
-      const interval = setInterval(() => {
-        setTimeRemaining((prev) => {
-          if (prev <= 1) {
-            clearInterval(interval);
-            submitTest();
-            return 0;
-          }
-          return prev - 1;
-        });
-      }, 1000);
-      setTimerInterval(interval);
+      setStartingTest(null);
     } catch (error) {
-      console.error('Error loading practice test:', error);
-      alert('Failed to load practice test. Please try again.');
+      console.error('Failed to load practice test:', error);
+      setStartingTest(null);
     }
   };
 
-  useEffect(() => {
-    return () => {
-      if (timerInterval) {
-        clearInterval(timerInterval);
-      }
-    };
-  }, [timerInterval]);
-
   const submitTest = () => {
     if (!selectedTest) return;
-    if (timerInterval) {
-      clearInterval(timerInterval);
-    }
 
     let correct = 0;
     const detailedResults = selectedTest.questions.map((q) => {
@@ -229,77 +168,134 @@ export default function PracticeTestsPage() {
     setTestStarted(false);
   };
 
-  const formatTime = (seconds: number) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins}:${secs.toString().padStart(2, '0')}`;
-  };
-
+  // =========================================
+  // TEST IN PROGRESS UI
+  // =========================================
   if (testStarted && selectedTest) {
     const currentQuestion = selectedTest.questions[currentQuestionIndex];
     const isLastQuestion = currentQuestionIndex === selectedTest.questions.length - 1;
 
+    if (!currentQuestion) {
+      return (
+        <DashboardLayout>
+          <div className="space-y-6">
+            <div className="bg-black modern-card glow-border p-6 rounded-xl text-center">
+              <p className="text-textSecondary">Error: Question not found. Please try again.</p>
+              <button
+                onClick={() => {
+                  setTestStarted(false);
+                  setSelectedTest(null);
+                }}
+                className="mt-4 px-6 py-3 bg-primary hover:bg-primary/90 text-white rounded-lg transition-all"
+              >
+                Back to Tests
+              </button>
+            </div>
+          </div>
+        </DashboardLayout>
+      );
+    }
+
     return (
       <DashboardLayout>
-        <div className="space-y-6">
-          {/* Test Header */}
-          <div className="bg-black modern-card glow-border p-4 rounded-xl flex items-center justify-between">
+        <div className="space-y-6 relative z-0">
+          {/* Header */}
+          <div className="bg-black modern-card glow-border p-4 rounded-xl flex items-center justify-between relative z-10">
             <div>
               <h2 className="text-xl font-bold text-text">{selectedTest.title}</h2>
               <p className="text-sm text-textSecondary">
                 Question {currentQuestionIndex + 1} of {selectedTest.questions.length}
               </p>
             </div>
-            <div className="flex items-center gap-4">
-              <div className="flex items-center gap-2">
-                <Clock className="w-5 h-5 text-primary" />
-                <span className="font-bold text-text">{formatTime(timeRemaining)}</span>
-              </div>
-            </div>
+
+            <button
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                setTestStarted(false);
+                setSelectedTest(null);
+                setCurrentQuestionIndex(0);
+                setAnswers({});
+              }}
+              className="px-4 py-2 bg-card hover:bg-card/80 text-text rounded-lg transition-all text-sm flex items-center gap-2 relative z-10 cursor-pointer"
+              type="button"
+            >
+              <ArrowLeft className="w-4 h-4" /> Exit Test
+            </button>
+          </div>
+
+          {/* Progress */}
+          <div className="bg-card/30 rounded-full h-2 overflow-hidden relative z-10">
+            <div
+              className="bg-primary h-full transition-all duration-300"
+              style={{ width: `${((currentQuestionIndex + 1) / selectedTest.questions.length) * 100}%` }}
+            />
           </div>
 
           {/* Question */}
-          <div className="bg-black modern-card glow-border p-6 rounded-xl">
+          <div className="bg-black modern-card glow-border p-6 rounded-xl relative z-10">
             <h3 className="text-lg font-bold text-text mb-6">{currentQuestion.question}</h3>
-            <div className="space-y-3">
-              {currentQuestion.options.map((option, index) => (
-                <button
-                  key={index}
-                  onClick={() => setAnswers({ ...answers, [currentQuestion.id]: index })}
-                  className={`w-full text-left p-4 rounded-lg transition-all ${
-                    answers[currentQuestion.id] === index
-                      ? 'bg-primary text-white'
-                      : 'bg-card/50 text-text hover:bg-card'
-                  }`}
-                >
-                  {option}
-                </button>
-              ))}
+
+            <div className="space-y-3 relative z-20">
+              {currentQuestion.options.map((option, index) => {
+                const isSelected = answers[currentQuestion.id] === index;
+                return (
+                  <button
+                    key={`${currentQuestion.id}-${index}`}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      setAnswers((prevAnswers) => ({
+                        ...prevAnswers,
+                        [currentQuestion.id]: index,
+                      }));
+                    }}
+                    className={`w-full text-left p-4 rounded-lg transition-all border-2 relative z-20 cursor-pointer ${
+                      isSelected
+                        ? 'bg-primary text-white border-primary shadow-glow-orange'
+                        : 'bg-card/50 text-text hover:bg-card border-transparent hover:border-primary/30'
+                    }`}
+                    type="button"
+                    style={{ pointerEvents: 'auto' }}
+                  >
+                    <span className="font-medium mr-2">{String.fromCharCode(65 + index)}.</span>
+                    {option}
+                  </button>
+                );
+              })}
             </div>
+            {answers[currentQuestion.id] !== undefined && (
+              <div className="mt-4 p-3 bg-primary/10 border border-primary/30 rounded-lg">
+                <p className="text-sm text-textSecondary">
+                  ✓ Answer selected: <span className="text-primary font-medium">{String.fromCharCode(65 + answers[currentQuestion.id])}</span>
+                </p>
+              </div>
+            )}
           </div>
 
           {/* Navigation */}
-          <div className="flex justify-between">
+          <div className="flex justify-between items-center">
             <button
               onClick={() => setCurrentQuestionIndex(Math.max(0, currentQuestionIndex - 1))}
               disabled={currentQuestionIndex === 0}
-              className="px-6 py-3 bg-card hover:bg-card/80 rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed text-text"
+              className="px-6 py-3 bg-card hover:bg-card/80 rounded-lg transition-all disabled:opacity-50 text-text font-medium"
             >
-              Previous
+              ← Previous
             </button>
+
             {isLastQuestion ? (
               <button
                 onClick={submitTest}
-                className="px-6 py-3 bg-primary hover:bg-primary/90 text-white rounded-lg transition-all"
+                className="px-6 py-3 bg-primary hover:bg-primary/90 text-white rounded-lg transition-all font-medium"
               >
-                Submit Test
+                Submit Test →
               </button>
             ) : (
               <button
                 onClick={() => setCurrentQuestionIndex(currentQuestionIndex + 1)}
-                className="px-6 py-3 bg-primary hover:bg-primary/90 text-white rounded-lg transition-all"
+                className="px-6 py-3 bg-primary hover:bg-primary/90 text-white rounded-lg transition-all font-medium"
               >
-                Next
+                Next →
               </button>
             )}
           </div>
@@ -308,6 +304,9 @@ export default function PracticeTestsPage() {
     );
   }
 
+  // =========================================
+  // RESULTS UI
+  // =========================================
   if (testCompleted && results) {
     return (
       <DashboardLayout>
@@ -323,43 +322,31 @@ export default function PracticeTestsPage() {
               You got {results.correct} out of {results.total} questions correct
             </p>
 
-            {/* Performance Chart */}
-            <div className="mb-6">
-              <ResponsiveContainer width="100%" height={200}>
-                <BarChart data={[{ name: 'Score', value: results.score }]}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="name" />
-                  <YAxis domain={[0, 100]} />
-                  <Tooltip />
-                  <Bar dataKey="value" fill="var(--color-primary)" />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-
             {/* Detailed Results */}
             <div className="space-y-4 text-left max-h-96 overflow-y-auto">
               {results.detailedResults.map((result: any, index: number) => (
-                <div
-                  key={index}
-                  className="p-4 bg-card/50 rounded-lg"
-                >
+                <div key={index} className="p-4 bg-card/50 rounded-lg">
                   <div className="flex items-start gap-3 mb-2">
                     {result.isCorrect ? (
-                      <CheckCircle className="w-5 h-5 text-green-400 mt-1 flex-shrink-0" />
+                      <CheckCircle className="w-5 h-5 text-green-400 mt-1" />
                     ) : (
-                      <XCircle className="w-5 h-5 text-red-400 mt-1 flex-shrink-0" />
+                      <XCircle className="w-5 h-5 text-red-400 mt-1" />
                     )}
+
                     <div className="flex-1">
                       <p className="font-bold text-text mb-2">{result.question}</p>
                       <p className="text-sm text-textSecondary mb-1">
-                        Your answer: <span className={result.isCorrect ? 'text-green-400' : 'text-red-400'}>
+                        Your answer:{' '}
+                        <span className={result.isCorrect ? 'text-green-400' : 'text-red-400'}>
                           {result.userAnswer}
                         </span>
                       </p>
                       <p className="text-sm text-textSecondary mb-2">
                         Correct answer: <span className="text-green-400">{result.correctAnswer}</span>
                       </p>
-                      <p className="text-sm text-textSecondary italic">{result.explanation}</p>
+                      {result.explanation && (
+                        <p className="text-sm text-textSecondary italic">{result.explanation}</p>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -367,12 +354,18 @@ export default function PracticeTestsPage() {
             </div>
 
             <button
-              onClick={() => {
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
                 setTestCompleted(false);
                 setResults(null);
                 setSelectedTest(null);
+                setTestStarted(false);
+                setCurrentQuestionIndex(0);
+                setAnswers({});
               }}
-              className="mt-6 px-6 py-3 bg-primary hover:bg-primary/90 text-white rounded-lg transition-all"
+              className="mt-6 px-6 py-3 bg-primary hover:bg-primary/90 text-white rounded-lg transition-all font-medium relative z-10 cursor-pointer"
+              type="button"
             >
               Take Another Test
             </button>
@@ -382,36 +375,36 @@ export default function PracticeTestsPage() {
     );
   }
 
+  // =========================================
+  // COURSE LIST UI
+  // =========================================
+  const coursesWithTests = courses.filter((course) => practiceTestsInfo[course.id]);
+
   return (
     <DashboardLayout>
       <div className="space-y-6">
-        <motion.div
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="mb-8"
-        >
+        <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }}>
           <h1 className="text-3xl font-bold text-text mb-2 flex items-center gap-3">
-            <FileText className="w-8 h-8 text-primary" />
-            Practice Tests
+            <FileText className="w-8 h-8 text-primary" /> Practice Tests
           </h1>
-          <p className="text-textSecondary">
-            Test your knowledge with mock exams and detailed explanations
-          </p>
+          <p className="text-textSecondary">Test your knowledge with mock exams & detailed explanations</p>
         </motion.div>
 
         {loading ? (
           <div className="text-center py-12">
             <p className="text-textSecondary">Loading practice tests...</p>
           </div>
-        ) : courses.length === 0 ? (
+        ) : coursesWithTests.length === 0 ? (
           <div className="text-center py-12">
-            <p className="text-textSecondary">No practice tests available.</p>
+            <p className="text-textSecondary">
+              No practice tests available. Please contact admin to add practice tests.
+            </p>
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {courses.map((course) => {
-              // Get practice test info if available
-              const testInfo = tests.find((t) => t.id === course.id);
+            {coursesWithTests.map((course) => {
+              const testInfo = practiceTestsInfo[course.id];
+
               return (
                 <motion.div
                   key={course.id}
@@ -421,29 +414,38 @@ export default function PracticeTestsPage() {
                 >
                   <div className="flex items-start justify-between mb-4">
                     <FileText className="w-8 h-8 text-primary" />
-                    <span className={`px-2 py-1 rounded text-xs ${
-                      testInfo?.difficulty === 'beginner' || !testInfo ? 'bg-green-500/20 text-green-400' :
-                      testInfo.difficulty === 'intermediate' ? 'bg-yellow-500/20 text-yellow-400' :
-                      'bg-red-500/20 text-red-400'
-                    }`}>
-                      {testInfo?.difficulty || 'beginner'}
+                    <span
+                      className={`px-2 py-1 rounded text-xs ${
+                        testInfo?.difficulty === 'beginner'
+                          ? 'bg-green-500/20 text-green-400'
+                          : testInfo?.difficulty === 'intermediate'
+                          ? 'bg-yellow-500/20 text-yellow-400'
+                          : 'bg-red-500/20 text-red-400'
+                      }`}
+                    >
+                      {testInfo?.difficulty}
                     </span>
                   </div>
-                  <h3 className="text-xl font-bold text-text mb-2">{course.title}</h3>
-                  <p className="text-textSecondary mb-4">{course.description || 'Comprehensive practice test covering all subjects in this course'}</p>
+
+                  <h3 className="text-xl font-bold text-text mb-2">{testInfo?.title}</h3>
+                  <p className="text-textSecondary mb-4">{testInfo?.description}</p>
+
                   <div className="flex items-center justify-between text-sm text-textSecondary mb-4">
                     <div className="flex items-center gap-2">
-                      <Clock className="w-4 h-4" />
-                      {testInfo?.duration || 30} minutes
+                      <Clock className="w-4 h-4" /> {testInfo?.duration} minutes
                     </div>
-                    <div>{testInfo?.questions?.length || 'Multiple'} questions</div>
+                    <div>{testInfo?.questionCount} questions</div>
                   </div>
-                  <button
-                    onClick={() => startTest(course.id)}
-                    className="w-full px-4 py-2 bg-primary hover:bg-primary/90 text-white rounded-lg transition-all"
-                  >
-                    Start Test
-                  </button>
+
+                  <div className="relative z-50">
+                    <button
+                      onClick={() => startTest(course.id)}
+                      disabled={startingTest === course.id}
+                      className="w-full px-4 py-2 bg-primary hover:bg-primary/90 text-white rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed font-medium"
+                    >
+                      {startingTest === course.id ? 'Loading...' : 'Start Test'}
+                    </button>
+                  </div>
                 </motion.div>
               );
             })}
@@ -453,4 +455,3 @@ export default function PracticeTestsPage() {
     </DashboardLayout>
   );
 }
-

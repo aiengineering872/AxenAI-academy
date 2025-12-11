@@ -239,7 +239,7 @@ export default function ProjectLabPage() {
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: index * 0.1 }}
-                className="bg-black modern-card glow-border p-6 rounded-xl transition-all"
+                className="bg-black modern-card glow-border p-6 rounded-xl transition-all relative"
               >
                 <div className="flex items-start justify-between mb-4">
                   <div className="flex items-center gap-3">
@@ -283,7 +283,8 @@ export default function ProjectLabPage() {
                     href={project.githubLink}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="flex items-center gap-2 text-body-strong text-primary hover:underline mb-4"
+                    className="flex items-center gap-2 text-body-strong text-primary hover:underline mb-4 relative z-10"
+                    onClick={(e) => e.stopPropagation()}
                   >
                     <Github className="w-4 h-4" />
                     View on GitHub
@@ -300,21 +301,31 @@ export default function ProjectLabPage() {
                   </div>
                 )}
 
-                <div className="flex items-center gap-4 pt-4 border-t border-card">
+                <div className="flex items-center gap-4 pt-4 border-t border-card relative z-10">
                   <button
-                    onClick={() => handleUpvote(project.id)}
-                    className={`flex items-center gap-2 text-caption transition-all ${
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      handleUpvote(project.id);
+                    }}
+                    className={`flex items-center gap-2 text-caption transition-all relative z-20 cursor-pointer ${
                       isUpvoted(project)
                         ? 'text-primary'
                         : 'hover:text-primary'
                     }`}
+                    type="button"
                   >
                     <ThumbsUp className={`w-5 h-5 ${isUpvoted(project) ? 'fill-current' : ''}`} />
                     {project.upvotes}
                   </button>
                   <button
-                    onClick={() => setSelectedProjectId(project.id)}
-                    className="flex items-center gap-2 text-caption hover:text-primary transition-all"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      setSelectedProjectId(project.id);
+                    }}
+                    className="flex items-center gap-2 text-caption hover:text-primary transition-all relative z-20 cursor-pointer"
+                    type="button"
                   >
                     <MessageSquare className="w-5 h-5" />
                     {project.comments}

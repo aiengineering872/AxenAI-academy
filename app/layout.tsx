@@ -3,7 +3,7 @@ import { Inter, Work_Sans } from 'next/font/google';
 import './globals.css';
 import { ThemeProvider } from '@/contexts/ThemeContext';
 import { AuthProvider } from '@/contexts/AuthContext';
-import { ServiceWorkerRegistration } from './components/ServiceWorkerRegistration';
+import { ServiceWorkerRegistration } from '@/components/pwa/ServiceWorkerRegistration';
 import { UserActivityTracker } from '@/components/activity/UserActivityTracker';
 
 const inter = Inter({

@@ -24,7 +24,7 @@ import { useTheme } from '@/contexts/ThemeContext';
 const menuItems = [
   { icon: Home, label: 'Dashboard', path: '/dashboard' },
   { icon: BookOpen, label: 'Learning Hub', path: '/learning' },
-  { icon: Code, label: 'Code Simulator', path: '/simulator' },
+  { icon: Code, label: 'Code Editor', path: '/simulator' },
   { icon: FlaskConical, label: 'Project Lab', path: '/projects' },
   { icon: MessageSquare, label: 'AI Mentor', path: '/mentor' },
   { icon: Trophy, label: 'Leaderboard', path: '/leaderboard' },
@@ -58,9 +58,7 @@ export const Sidebar: React.FC = () => {
   };
 
   return (
-    <motion.aside
-      initial={{ x: -100 }}
-      animate={{ x: 0 }}
+    <aside
       className={`w-64 min-h-screen ${getThemeStyles()} transition-theme hidden md:block`}
     >
       <div className="p-6">
@@ -86,10 +84,8 @@ export const Sidebar: React.FC = () => {
             }
             
             return (
-              <motion.div
+              <div
                 key={item.path}
-                whileHover={{ x: 4 }}
-                whileTap={{ scale: 0.95 }}
                 onClick={() => {
                   if (typeof window !== 'undefined') {
                     window.location.href = item.path;
@@ -103,14 +99,12 @@ export const Sidebar: React.FC = () => {
               >
                 <Icon className="w-5 h-5" />
                 <span className="font-medium">{item.label}</span>
-              </motion.div>
+              </div>
             );
           })}
 
           {isAdmin && (
-            <motion.div
-              whileHover={{ x: 4 }}
-              whileTap={{ scale: 0.95 }}
+            <div
               onClick={() => {
                 if (typeof window !== 'undefined') {
                   window.location.href = '/admin';
@@ -124,7 +118,7 @@ export const Sidebar: React.FC = () => {
             >
               <Settings className="w-5 h-5" />
               <span className="font-medium">Admin Panel</span>
-            </motion.div>
+            </div>
           )}
         </nav>
 
@@ -173,7 +167,7 @@ export const Sidebar: React.FC = () => {
           </button>
         </div>
       </div>
-    </motion.aside>
+    </aside>
   );
 };
 

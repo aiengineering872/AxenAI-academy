@@ -3,8 +3,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { ModuleLayout } from '@/components/layout/ModuleLayout';
 import { motion } from 'framer-motion';
-import { CheckCircle, ArrowLeft, ArrowRight, ExternalLink, Video, Code2, Brain, Target, Grid3x3, ChevronRight, Code, ListChecks, FileText, Volume2, Square } from 'lucide-react';
+import { CheckCircle, ArrowLeft, ArrowRight, ExternalLink, Video, Code2, Brain, Target, Grid3x3, ChevronRight, Code, ListChecks, FileText, Volume2, Square, Boxes } from 'lucide-react';
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import { learningProgressService } from '@/lib/services/learningProgressService';
 import { adminService } from '@/lib/services/adminService';
 
@@ -55,6 +56,7 @@ interface ModuleContentProps {
 }
 
 export default function ModuleContent({ courseId, moduleId }: ModuleContentProps) {
+  const pathname = usePathname();
   const [currentLesson, setCurrentLesson] = useState(0);
   const [lessons, setLessons] = useState<Lesson[]>([]);
   const [moduleTitle, setModuleTitle] = useState<string>('');
@@ -805,71 +807,34 @@ export default function ModuleContent({ courseId, moduleId }: ModuleContentProps
               </div>
             </div>
 
-            {/* Simulators Section - Takes 1 column */}
-            <div className="lg:col-span-1 glass p-6 rounded-xl">
+            {/* Simulator Box - Takes 1 column */}
+            <div className="glass p-6 rounded-xl">
               <div className="flex items-center gap-3 mb-4">
-                <Code2 className="w-5 h-5 text-primary" />
-                <h3 className="text-xl font-bold text-text">Simulators</h3>
+                <Boxes className="w-5 h-5 text-primary" />
+                <h3 className="text-xl font-bold text-text">3D Simulators</h3>
               </div>
-              <div className="space-y-3">
-                {lessons[currentLesson]?.simulators && lessons[currentLesson]?.simulators.length > 0 ? (
-                  lessons[currentLesson].simulators.map((simulatorName, index) => {
-                    // Map simulator name to type for URL
-                    const getSimulatorType = (name: string): string => {
-                      const lowerName = name.toLowerCase();
-                      if (lowerName.includes('machine learning') || lowerName.includes('ml')) {
-                        return 'machine-learning';
-                      }
-                      if (lowerName.includes('bias') || lowerName.includes('variance')) {
-                        return 'bias-variance';
-                      }
-                      if (lowerName.includes('confusion') || lowerName.includes('matrix')) {
-                        return 'confusion-matrix';
-                      }
-                      // Default fallback
-                      return 'machine-learning';
-                    };
-
-                    // Map simulator name to icon
-                    const getSimulatorIcon = (name: string) => {
-                      const lowerName = name.toLowerCase();
-                      if (lowerName.includes('machine learning') || lowerName.includes('ml')) {
-                        return Brain;
-                      }
-                      if (lowerName.includes('bias') || lowerName.includes('variance')) {
-                        return Target;
-                      }
-                      if (lowerName.includes('confusion') || lowerName.includes('matrix')) {
-                        return Grid3x3;
-                      }
-                      return Code;
-                    };
-
-                    const SimulatorIcon = getSimulatorIcon(simulatorName);
-                    // Create URL-friendly topic name
-                    const topicSlug = simulatorName.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
-
-                    return (
-                      <Link key={index} href={`/simulator/topic/${topicSlug}`}>
-                        <motion.div
-                          whileHover={{ scale: 1.02, x: 4 }}
-                          className="flex items-center gap-3 p-3 bg-card/50 rounded-xl hover:bg-card/70 cursor-pointer transition-all"
-                        >
-                          <SimulatorIcon className="w-5 h-5 text-primary" />
-                          <span className="flex-1 text-text font-medium text-sm">{simulatorName}</span>
-                          <ChevronRight className="w-4 h-4 text-textSecondary" />
-                        </motion.div>
-                      </Link>
-                    );
-                  })
-                ) : (
-                  <div className="text-center py-4">
-                    <Code className="w-12 h-12 text-textSecondary mx-auto mb-2" />
-                    <p className="text-textSecondary text-sm">No simulators available</p>
-                  </div>
-                )}
+              <div className="bg-black rounded-xl p-6 flex flex-col items-center justify-center min-h-[400px] border border-primary/20">
+                <div className="text-center mb-6">
+                  <Boxes className="w-20 h-20 text-primary mx-auto mb-4" />
+                  <p className="text-textSecondary mb-4">
+                    Explore interactive 3D simulators for hands-on learning
+                  </p>
+                </div>
+                <Link
+                  href="/3d-simulators"
+                  onClick={() => {
+                    if (typeof window !== 'undefined' && pathname) {
+                      sessionStorage.setItem('simulatorReturnUrl', pathname);
+                    }
+                  }}
+                  className="inline-flex items-center gap-2 px-6 py-3 bg-primary hover:bg-primary/90 text-white rounded-lg transition-all font-medium"
+                >
+                  Go to simulator
+                  <ArrowRight className="w-5 h-5" />
+                </Link>
               </div>
             </div>
+
           </div>
 
           {lessons[currentLesson]?.googleColabUrl && (

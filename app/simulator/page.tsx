@@ -20,7 +20,7 @@ function CodeSimulatorContent() {
   const searchParams = useSearchParams();
   const simulatorType = searchParams.get('type') || 'default';
   
-  const [code, setCode] = useState(`# Welcome to AI Code Simulator
+  const [code, setCode] = useState(`# Welcome to AI Code Editor
 # Preloaded libraries: numpy, pandas, scikit-learn, matplotlib, scipy
 
 import numpy as np
@@ -43,7 +43,7 @@ plt.grid(True)
 print("Plot data generated!")
 print("X values (first 5):", x[:5])
 print("Y values (first 5):", y[:5])
-print("Hello from AI Code Simulator!")`);
+print("Hello from AI Code Editor!")`);
   const [output, setOutput] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -63,10 +63,10 @@ print("Hello from AI Code Simulator!")`);
     switch (simulatorType) {
       case 'machine-learning':
         return {
-          title: 'Machine Learning Simulator',
+          title: 'Machine Learning Code Editor',
           icon: Brain,
           description: 'Practice machine learning concepts with interactive code',
-          defaultCode: `# Machine Learning Simulator
+          defaultCode: `# Machine Learning Code Editor
 # Preloaded libraries: numpy, pandas, scikit-learn, matplotlib
 
 import numpy as np
@@ -99,10 +99,10 @@ print(f"Model Intercept: {model.intercept_:.2f}")`
         };
       case 'bias-variance':
         return {
-          title: 'Bias-Variance Tradeoff Simulator',
+          title: 'Bias-Variance Tradeoff Code Editor',
           icon: Target,
           description: 'Explore the bias-variance tradeoff in machine learning',
-          defaultCode: `# Bias-Variance Tradeoff Simulator
+          defaultCode: `# Bias-Variance Tradeoff Code Editor
 # Preloaded libraries: numpy, pandas, scikit-learn, matplotlib
 
 import numpy as np
@@ -125,10 +125,10 @@ print(f"Target shape: {y.shape}")`
         };
       case 'confusion-matrix':
         return {
-          title: 'Confusion Matrix Simulator',
+          title: 'Confusion Matrix Code Editor',
           icon: Grid3x3,
           description: 'Visualize and understand confusion matrices',
-          defaultCode: `# Confusion Matrix Simulator
+          defaultCode: `# Confusion Matrix Code Editor
 # Preloaded libraries: numpy, pandas, scikit-learn, matplotlib
 
 import numpy as np
@@ -149,10 +149,10 @@ print(classification_report(y_true, y_pred))`
         };
       default:
         return {
-          title: 'AI Code Simulator',
+          title: 'AI Code Editor',
           icon: Brain,
           description: 'Practice AI and ML concepts with interactive code',
-          defaultCode: `# Welcome to AI Code Simulator
+          defaultCode: `# Welcome to AI Code Editor
 # Preloaded libraries: numpy, pandas, scikit-learn, matplotlib, scipy
 
 import numpy as np
@@ -171,7 +171,7 @@ plt.title('Simple Plot Example')
 plt.legend()
 plt.grid(True)
 
-print("Hello from AI Code Simulator!")`
+print("Hello from AI Code Editor!")`
         };
     }
   };
@@ -758,9 +758,9 @@ print(json.dumps(result, indent=2))
           <motion.div
             initial={{ opacity: 0, x: -20 }}
             animate={{ opacity: 1, x: 0 }}
-            className="bg-black modern-card glow-border rounded-xl overflow-hidden"
+            className="bg-black modern-card glow-border rounded-xl overflow-hidden relative"
           >
-            <div className="bg-card/50 p-4 flex items-center justify-between border-b border-card">
+            <div className="bg-card/50 p-4 flex items-center justify-between border-b border-card relative z-10">
               <div className="flex items-center gap-2">
                 <span className="text-sm font-medium text-text">Python Editor</span>
                 {mounted && (
@@ -781,49 +781,84 @@ print(json.dumps(result, indent=2))
                   <span className="text-xs text-textSecondary">Loading...</span>
                 )}
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 relative z-20">
                 <button
-                  onClick={() => loadExample('ml')}
-                  className="px-3 py-1 text-xs bg-card hover:bg-card/80 rounded transition-all"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    loadExample('ml');
+                  }}
+                  className="px-3 py-1 text-xs bg-card hover:bg-card/80 rounded transition-all relative z-20 cursor-pointer"
+                  type="button"
                 >
                   ML Example
                 </button>
                 <button
-                  onClick={() => loadExample('dl')}
-                  className="px-3 py-1 text-xs bg-card hover:bg-card/80 rounded transition-all"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    loadExample('dl');
+                  }}
+                  className="px-3 py-1 text-xs bg-card hover:bg-card/80 rounded transition-all relative z-20 cursor-pointer"
+                  type="button"
                 >
                   DL Example
                 </button>
                 <button
-                  onClick={() => loadExample('data')}
-                  className="px-3 py-1 text-xs bg-card hover:bg-card/80 rounded transition-all"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    loadExample('data');
+                  }}
+                  className="px-3 py-1 text-xs bg-card hover:bg-card/80 rounded transition-all relative z-20 cursor-pointer"
+                  type="button"
                 >
                   Data Example
                 </button>
                 <button
-                  onClick={() => loadExample('genai')}
-                  className="px-3 py-1 text-xs bg-card hover:bg-card/80 rounded transition-all"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    loadExample('genai');
+                  }}
+                  className="px-3 py-1 text-xs bg-card hover:bg-card/80 rounded transition-all relative z-20 cursor-pointer"
+                  type="button"
                 >
                   GenAI Example
                 </button>
                 <button
-                  onClick={handleUploadClick}
-                  className="px-3 py-1 text-xs bg-primary/80 hover:bg-primary/90 text-white rounded transition-all flex items-center gap-1"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    handleUploadClick();
+                  }}
+                  className="px-3 py-1 text-xs bg-primary/80 hover:bg-primary/90 text-white rounded transition-all flex items-center gap-1 relative z-20 cursor-pointer"
+                  type="button"
                 >
                   <Upload className="w-3 h-3" />
                   Upload Dataset
                 </button>
                 <button
-                  onClick={insertDatasetSnippet}
-                  className="px-3 py-1 text-xs bg-card hover:bg-card/80 rounded transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    insertDatasetSnippet();
+                  }}
+                  className="px-3 py-1 text-xs bg-card hover:bg-card/80 rounded transition-all disabled:opacity-50 disabled:cursor-not-allowed relative z-20 cursor-pointer"
                   disabled={!datasetPath}
+                  type="button"
                 >
                   Load Uploaded Dataset
                 </button>
                 <button
-                  onClick={clearCode}
-                  className="p-2 hover:bg-card/80 rounded transition-all"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    clearCode();
+                  }}
+                  className="p-2 hover:bg-card/80 rounded transition-all relative z-20 cursor-pointer"
                   aria-label="Clear code"
+                  type="button"
                 >
                   <Trash2 className="w-4 h-4" />
                 </button>
@@ -839,7 +874,7 @@ print(json.dumps(result, indent=2))
             <textarea
               value={code}
               onChange={(e) => setCode(e.target.value)}
-              className="w-full h-[500px] p-4 font-mono text-sm resize-none focus:outline-none focus:ring-2 focus:ring-primary/50"
+              className="w-full h-[500px] p-4 font-mono text-sm resize-none focus:outline-none focus:ring-2 focus:ring-primary/50 relative z-10"
               placeholder="Write your Python code here..."
               spellCheck={false}
               style={{ 
@@ -847,17 +882,23 @@ print(json.dumps(result, indent=2))
                 backgroundColor: 'rgba(26, 35, 50, 0.95)',
                 caretColor: '#ff6b35',
                 border: 'none',
-                outline: 'none'
+                outline: 'none',
+                pointerEvents: 'auto'
               }}
             />
-            <div className="bg-card/50 p-4 border-t border-card">
+            <div className="bg-card/50 p-4 border-t border-card relative z-10">
               {datasetInfo && (
                 <div className="mb-3 text-xs text-green-400">{datasetInfo}</div>
               )}
               <button
-                onClick={executeCode}
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  executeCode();
+                }}
                 disabled={loading || !code.trim() || !pyodideReady || initializing || !mounted}
-                className="flex items-center gap-2 px-6 py-3 bg-primary hover:bg-primary/90 text-white font-medium rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                className="flex items-center gap-2 px-6 py-3 bg-primary hover:bg-primary/90 text-white font-medium rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed relative z-20 cursor-pointer"
+                type="button"
               >
                 {loading ? (
                   <>
@@ -878,15 +919,20 @@ print(json.dumps(result, indent=2))
           <motion.div
             initial={{ opacity: 0, x: 20 }}
             animate={{ opacity: 1, x: 0 }}
-            className="bg-black modern-card glow-border rounded-xl overflow-hidden"
+            className="bg-black modern-card glow-border rounded-xl overflow-hidden relative"
           >
-            <div className="bg-card/50 p-4 border-b border-card flex items-center justify-between">
+            <div className="bg-card/50 p-4 border-b border-card flex items-center justify-between relative z-10">
               <span className="text-sm font-medium text-text">Console Output</span>
               {(output || error || richOutputs.length) && (
                 <button
-                  onClick={clearOutput}
-                  className="px-3 py-1 text-xs bg-card hover:bg-card/80 rounded transition-all text-textSecondary hover:text-text"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    clearOutput();
+                  }}
+                  className="px-3 py-1 text-xs bg-card hover:bg-card/80 rounded transition-all text-textSecondary hover:text-text relative z-20 cursor-pointer"
                   aria-label="Clear output"
+                  type="button"
                 >
                   Clear Output
                 </button>
@@ -1005,7 +1051,7 @@ export default function CodeSimulatorPage() {
         <div className="space-y-6">
           <div className="bg-black modern-card glow-border p-6 rounded-xl text-center">
             <Loader2 className="w-8 h-8 animate-spin text-primary mx-auto mb-4" />
-            <p className="text-textSecondary">Loading simulator...</p>
+            <p className="text-textSecondary">Loading code editor...</p>
           </div>
         </div>
       </DashboardLayout>

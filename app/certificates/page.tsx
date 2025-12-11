@@ -142,7 +142,7 @@ export default function CertificatesPage() {
                 key={cert.id}
                 initial={{ opacity: 0, scale: 0.9 }}
                 animate={{ opacity: 1, scale: 1 }}
-                className="bg-black modern-card glow-border p-6 rounded-xl hover:shadow-glow transition-all"
+                className="bg-black modern-card glow-border p-6 rounded-xl transition-all relative"
               >
                 <div className="flex items-start justify-between mb-4">
                   <div>
@@ -157,17 +157,27 @@ export default function CertificatesPage() {
                   <CheckCircle className="w-8 h-8 text-green-400" />
                 </div>
 
-                <div className="flex gap-3 mt-6">
+                <div className="flex gap-3 mt-6 relative z-10">
                   <button
-                    onClick={() => generatePDF(cert)}
-                    className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-primary hover:bg-primary/90 text-white rounded-lg transition-all"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      generatePDF(cert);
+                    }}
+                    className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-primary hover:bg-primary/90 text-white rounded-lg transition-all relative z-20 cursor-pointer"
+                    type="button"
                   >
                     <Download className="w-4 h-4" />
                     Download PDF
                   </button>
                   <button
-                    onClick={() => copyShareableLink(cert.shareableLink)}
-                    className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-card hover:bg-card/80 text-text rounded-lg transition-all"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      copyShareableLink(cert.shareableLink);
+                    }}
+                    className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-card hover:bg-card/80 text-text rounded-lg transition-all relative z-20 cursor-pointer"
+                    type="button"
                   >
                     <Share2 className="w-4 h-4" />
                     Share

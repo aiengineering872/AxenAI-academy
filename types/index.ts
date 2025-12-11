@@ -137,3 +137,21 @@ export interface ApiKey {
   createdAt: string;
 }
 
+export interface Simulator {
+  id: string;
+  type: string;
+  title: string;
+  description: string;
+  icon: string;
+  route: string;
+  defaultCode?: string;
+  instructions?: string;
+  supportsDataset?: boolean;
+}
+
+export interface ModuleSimulator {
+  moduleId: string;
+  simulatorType: string;
+  order?: number;
+}
+

@@ -536,11 +536,11 @@ Rules:
           {/* Form */}
           <div className="lg:col-span-2 space-y-6">
             {/* Personal Info */}
-            <div className="bg-black modern-card glow-border p-6 rounded-xl">
+            <div className="bg-black modern-card glow-border p-6 rounded-xl relative">
               <h2 className="text-section mb-4">Personal Information</h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 relative z-10">
                 {personalInfoFields.map((field) => (
-                  <div key={field.key} className="flex flex-col gap-2">
+                  <div key={field.key} className="flex flex-col gap-2 relative z-10">
                     <label className="text-caption text-textSecondary uppercase tracking-wide">
                       {field.label}
                       <span className="text-primary ml-1">*</span>
@@ -555,7 +555,8 @@ Rules:
                           personalInfo: { ...resumeData.personalInfo, [field.key]: e.target.value },
                         })
                       }
-                      className="w-full px-4 py-2 bg-card text-text rounded-lg border border-transparent focus:border-primary focus:ring-2 focus:ring-primary/40 transition-all"
+                      className="w-full px-4 py-2 bg-card text-text rounded-lg border border-transparent focus:border-primary focus:ring-2 focus:ring-primary/40 transition-all relative z-20"
+                      style={{ pointerEvents: 'auto' }}
                     />
                   </div>
                 ))}
@@ -568,18 +569,23 @@ Rules:
             </div>
 
             {/* Summary */}
-            <div className="bg-black modern-card glow-border p-6 rounded-xl">
+            <div className="bg-black modern-card glow-border p-6 rounded-xl relative">
               <div className="flex items-center justify-between mb-4">
                 <h2 className="text-section">Professional Summary</h2>
                 <button
-                  onClick={() => generateWithAI('summary')}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    generateWithAI('summary');
+                  }}
                   disabled={!geminiApiKey || generatingSection !== null}
                   title={geminiApiKey ? undefined : 'Add your Gemini API key in API Integration to enable AI generation'}
-                  className={`px-4 py-2 rounded-lg transition-all flex items-center gap-2 ${
+                  className={`px-4 py-2 rounded-lg transition-all flex items-center gap-2 relative z-20 cursor-pointer ${
                     geminiApiKey
                       ? 'bg-primary hover:bg-primary/90 text-white disabled:opacity-50'
                       : 'bg-card text-text opacity-70 cursor-not-allowed'
                   }`}
+                  type="button"
                 >
                   <Sparkles className="w-4 h-4" />
                   {generatingSection === 'summary' ? 'Generating...' : 'AI Generate'}
@@ -589,12 +595,13 @@ Rules:
                 value={resumeData.summary}
                 onChange={(e) => setResumeData({ ...resumeData, summary: e.target.value })}
                 placeholder="Write a professional summary or use AI to generate one"
-                className="w-full h-32 px-4 py-2 bg-card text-text rounded-lg"
+                className="w-full h-32 px-4 py-2 bg-card text-text rounded-lg relative z-10"
+                style={{ pointerEvents: 'auto' }}
               />
             </div>
 
             {/* Skills */}
-            <div className="bg-black modern-card glow-border p-6 rounded-xl">
+            <div className="bg-black modern-card glow-border p-6 rounded-xl relative">
               <h2 className="text-section mb-4">Skills</h2>
               <div className="flex flex-wrap gap-2 mb-4">
                 {resumeData.skills.map((skill, index) => (
@@ -604,11 +611,14 @@ Rules:
                   >
                     {skill}
                     <button
-                      onClick={() => {
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
                         const newSkills = resumeData.skills.filter((_, i) => i !== index);
                         setResumeData({ ...resumeData, skills: newSkills });
                       }}
-                      className="hover:text-red-400"
+                      className="hover:text-red-400 relative z-20 cursor-pointer"
+                      type="button"
                     >
                       ×
                     </button>
@@ -652,17 +662,23 @@ Rules:
                     setPendingSkill('');
                   }
                 }}
-                className="w-full px-4 py-2 bg-card text-text rounded-lg border border-transparent focus:border-primary focus:ring-2 focus:ring-primary/40 transition-all"
+                className="w-full px-4 py-2 bg-card text-text rounded-lg border border-transparent focus:border-primary focus:ring-2 focus:ring-primary/40 transition-all relative z-10"
+                style={{ pointerEvents: 'auto' }}
               />
             </div>
 
             {/* Experience */}
-            <div className="bg-black modern-card glow-border p-6 rounded-xl">
+            <div className="bg-black modern-card glow-border p-6 rounded-xl relative">
               <div className="flex items-center justify-between mb-4">
                 <h2 className="text-section">Experience</h2>
                 <button
-                  onClick={addExperience}
-                  className="px-4 py-2 bg-card hover:bg-card/80 text-text rounded-lg transition-all flex items-center gap-2"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    addExperience();
+                  }}
+                  className="px-4 py-2 bg-card hover:bg-card/80 text-text rounded-lg transition-all flex items-center gap-2 relative z-20 cursor-pointer"
+                  type="button"
                 >
                   <Plus className="w-4 h-4" />
                   Add
@@ -671,30 +687,43 @@ Rules:
               <div className="space-y-4">
               <div className="flex gap-2 items-center">
                 <span className="text-caption uppercase tracking-wide text-textSecondary">Experience Level:</span>
-                <div className="flex gap-2">
+                <div className="flex gap-2 relative z-10">
                   <button
-                    onClick={() => setExperienceLevel('fresher')}
-                    className={`px-3 py-1 rounded-lg text-caption transition-all ${experienceLevel === 'fresher' ? 'bg-primary text-white' : 'bg-card text-text hover:bg-card/80'}`}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      setExperienceLevel('fresher');
+                    }}
+                    className={`px-3 py-1 rounded-lg text-caption transition-all relative z-20 cursor-pointer ${experienceLevel === 'fresher' ? 'bg-primary text-white' : 'bg-card text-text hover:bg-card/80'}`}
+                    type="button"
                   >
                     Fresher
                   </button>
                   <button
-                    onClick={() => setExperienceLevel('experienced')}
-                    className={`px-3 py-1 rounded-lg text-caption transition-all ${experienceLevel === 'experienced' ? 'bg-primary text-white' : 'bg-card text-text hover:bg-card/80'}`}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      setExperienceLevel('experienced');
+                    }}
+                    className={`px-3 py-1 rounded-lg text-caption transition-all relative z-20 cursor-pointer ${experienceLevel === 'experienced' ? 'bg-primary text-white' : 'bg-card text-text hover:bg-card/80'}`}
+                    type="button"
                   >
                     Experienced
                   </button>
                 </div>
               </div>
                 {resumeData.experience.map((exp, index) => (
-                  <div key={index} className="p-4 bg-card/50 rounded-lg space-y-3">
-                    <div className="flex justify-end">
+                  <div key={index} className="p-4 bg-card/50 rounded-lg space-y-3 relative">
+                    <div className="flex justify-end relative z-10">
                       <button
-                        onClick={() => {
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
                           const newExp = resumeData.experience.filter((_, i) => i !== index);
                           setResumeData({ ...resumeData, experience: newExp });
                         }}
-                        className="text-red-400 hover:text-red-500"
+                        className="text-red-400 hover:text-red-500 relative z-20 cursor-pointer"
+                        type="button"
                       >
                         <Trash2 className="w-4 h-4" />
                       </button>
@@ -708,7 +737,8 @@ Rules:
                         newExp[index].title = e.target.value;
                         setResumeData({ ...resumeData, experience: newExp });
                       }}
-                      className="w-full px-3 py-2 bg-background text-text rounded"
+                      className="w-full px-3 py-2 bg-background text-text rounded relative z-10"
+                      style={{ pointerEvents: 'auto' }}
                     />
                     <div className="grid grid-cols-2 gap-3">
                       <input
@@ -720,7 +750,8 @@ Rules:
                           newExp[index].company = e.target.value;
                           setResumeData({ ...resumeData, experience: newExp });
                         }}
-                        className="w-full px-3 py-2 bg-background text-text rounded"
+                        className="w-full px-3 py-2 bg-background text-text rounded relative z-10"
+                        style={{ pointerEvents: 'auto' }}
                       />
                       <input
                         type="text"
@@ -731,7 +762,8 @@ Rules:
                           newExp[index].duration = e.target.value;
                           setResumeData({ ...resumeData, experience: newExp });
                         }}
-                        className="w-full px-3 py-2 bg-background text-text rounded"
+                        className="w-full px-3 py-2 bg-background text-text rounded relative z-10"
+                        style={{ pointerEvents: 'auto' }}
                       />
                     </div>
                     <textarea
@@ -742,7 +774,8 @@ Rules:
                         newExp[index].description = e.target.value;
                         setResumeData({ ...resumeData, experience: newExp });
                       }}
-                      className="w-full px-3 py-2 bg-background text-text rounded h-24"
+                      className="w-full px-3 py-2 bg-background text-text rounded h-24 relative z-10"
+                      style={{ pointerEvents: 'auto' }}
                     />
                   </div>
                 ))}
@@ -750,12 +783,17 @@ Rules:
             </div>
 
             {/* Education */}
-            <div className="bg-black modern-card glow-border p-6 rounded-xl">
+            <div className="bg-black modern-card glow-border p-6 rounded-xl relative">
               <div className="flex items-center justify-between mb-4">
                 <h2 className="text-section">Education</h2>
                 <button
-                  onClick={addEducation}
-                  className="px-4 py-2 bg-card hover:bg-card/80 text-text rounded-lg transition-all flex items-center gap-2"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    addEducation();
+                  }}
+                  className="px-4 py-2 bg-card hover:bg-card/80 text-text rounded-lg transition-all flex items-center gap-2 relative z-20 cursor-pointer"
+                  type="button"
                 >
                   <Plus className="w-4 h-4" />
                   Add
@@ -763,14 +801,17 @@ Rules:
               </div>
               <div className="space-y-4">
                 {resumeData.education.map((edu, index) => (
-                  <div key={index} className="p-4 bg-card/50 rounded-lg space-y-3">
-                    <div className="flex justify-end">
+                  <div key={index} className="p-4 bg-card/50 rounded-lg space-y-3 relative">
+                    <div className="flex justify-end relative z-10">
                       <button
-                        onClick={() => {
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
                           const newEdu = resumeData.education.filter((_, i) => i !== index);
                           setResumeData({ ...resumeData, education: newEdu });
                         }}
-                        className="text-red-400 hover:text-red-500"
+                        className="text-red-400 hover:text-red-500 relative z-20 cursor-pointer"
+                        type="button"
                       >
                         <Trash2 className="w-4 h-4" />
                       </button>
@@ -784,7 +825,8 @@ Rules:
                         newEdu[index].degree = e.target.value;
                         setResumeData({ ...resumeData, education: newEdu });
                       }}
-                      className="w-full px-3 py-2 bg-background text-text rounded"
+                      className="w-full px-3 py-2 bg-background text-text rounded relative z-10"
+                      style={{ pointerEvents: 'auto' }}
                     />
                     <div className="grid grid-cols-2 gap-3">
                       <input
@@ -796,7 +838,8 @@ Rules:
                           newEdu[index].institution = e.target.value;
                           setResumeData({ ...resumeData, education: newEdu });
                         }}
-                        className="w-full px-3 py-2 bg-background text-text rounded"
+                        className="w-full px-3 py-2 bg-background text-text rounded relative z-10"
+                        style={{ pointerEvents: 'auto' }}
                       />
                       <input
                         type="text"
@@ -807,7 +850,8 @@ Rules:
                           newEdu[index].year = e.target.value;
                           setResumeData({ ...resumeData, education: newEdu });
                         }}
-                        className="w-full px-3 py-2 bg-background text-text rounded"
+                        className="w-full px-3 py-2 bg-background text-text rounded relative z-10"
+                        style={{ pointerEvents: 'auto' }}
                       />
                     </div>
                   </div>
@@ -816,12 +860,17 @@ Rules:
             </div>
 
             {/* Projects */}
-            <div className="bg-black modern-card glow-border p-6 rounded-xl">
+            <div className="bg-black modern-card glow-border p-6 rounded-xl relative">
               <div className="flex items-center justify-between mb-4">
                 <h2 className="text-section">Projects</h2>
                 <button
-                  onClick={addProject}
-                  className="px-4 py-2 bg-card hover:bg-card/80 text-text rounded-lg transition-all flex items-center gap-2"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    addProject();
+                  }}
+                  className="px-4 py-2 bg-card hover:bg-card/80 text-text rounded-lg transition-all flex items-center gap-2 relative z-20 cursor-pointer"
+                  type="button"
                 >
                   <Plus className="w-4 h-4" />
                   Add
@@ -829,14 +878,17 @@ Rules:
               </div>
               <div className="space-y-4">
                 {resumeData.projects.map((proj, index) => (
-                  <div key={index} className="p-4 bg-card/50 rounded-lg space-y-3">
-                    <div className="flex justify-end">
+                  <div key={index} className="p-4 bg-card/50 rounded-lg space-y-3 relative">
+                    <div className="flex justify-end relative z-10">
                       <button
-                        onClick={() => {
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
                           const newProj = resumeData.projects.filter((_, i) => i !== index);
                           setResumeData({ ...resumeData, projects: newProj });
                         }}
-                        className="text-red-400 hover:text-red-500"
+                        className="text-red-400 hover:text-red-500 relative z-20 cursor-pointer"
+                        type="button"
                       >
                         <Trash2 className="w-4 h-4" />
                       </button>
@@ -850,7 +902,8 @@ Rules:
                         newProj[index].name = e.target.value;
                         setResumeData({ ...resumeData, projects: newProj });
                       }}
-                      className="w-full px-3 py-2 bg-background text-text rounded"
+                      className="w-full px-3 py-2 bg-background text-text rounded relative z-10"
+                      style={{ pointerEvents: 'auto' }}
                     />
                     <textarea
                       placeholder="Project description"
@@ -860,7 +913,8 @@ Rules:
                         newProj[index].description = e.target.value;
                         setResumeData({ ...resumeData, projects: newProj });
                       }}
-                      className="w-full px-3 py-2 bg-background text-text rounded h-24"
+                      className="w-full px-3 py-2 bg-background text-text rounded h-24 relative z-10"
+                      style={{ pointerEvents: 'auto' }}
                     />
                     <input
                       type="text"
@@ -873,7 +927,8 @@ Rules:
                           e.currentTarget.value = '';
                         }
                       }}
-                      className="w-full px-3 py-2 bg-background text-text rounded"
+                      className="w-full px-3 py-2 bg-background text-text rounded relative z-10"
+                      style={{ pointerEvents: 'auto' }}
                     />
                   </div>
                 ))}
@@ -882,7 +937,7 @@ Rules:
           </div>
 
           {/* AI Full Resume Generation */}
-          <div className="bg-black modern-card glow-border p-6 rounded-xl">
+          <div className="bg-black modern-card glow-border p-6 rounded-xl relative">
             <div className="flex items-start justify-between gap-4">
               <div>
                 <h2 className="text-section mb-2 flex items-center gap-2">
@@ -894,7 +949,11 @@ Rules:
                 </p>
               </div>
               <button
-                onClick={generateFullResume}
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  generateFullResume();
+                }}
                 disabled={!canGenerateFullResume}
                 title={
                   !geminiApiKey
@@ -903,11 +962,12 @@ Rules:
                     ? `Complete: ${missingSections.join(', ')}`
                     : undefined
                 }
-                className={`px-4 py-2 rounded-lg transition-all flex items-center gap-2 ${
+                className={`px-4 py-2 rounded-lg transition-all flex items-center gap-2 relative z-20 cursor-pointer ${
                   canGenerateFullResume
                     ? 'bg-primary hover:bg-primary/90 text-white disabled:opacity-50'
                     : 'bg-card text-text opacity-70 cursor-not-allowed'
                 }`}
+                type="button"
               >
                 <Bot className="w-4 h-4" />
                 {generatingSection === 'full' ? 'Generating...' : 'Generate Full Resume'}
@@ -922,40 +982,53 @@ Rules:
 
           {/* Preview & Actions */}
           <div className="lg:col-span-1">
-            <div className="bg-black modern-card glow-border p-6 rounded-xl sticky top-4">
+            <div className="bg-black modern-card glow-border p-6 rounded-xl sticky top-4 relative">
               <h2 className="text-section mb-4">Actions</h2>
-              <div className="space-y-3">
+              <div className="space-y-3 relative z-10">
                 <button
-                  onClick={exportToPDF}
-                  className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-primary hover:bg-primary/90 text-white rounded-lg transition-all"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    exportToPDF();
+                  }}
+                  className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-primary hover:bg-primary/90 text-white rounded-lg transition-all relative z-20 cursor-pointer"
+                  type="button"
                 >
                   <Download className="w-5 h-5" />
                   Export to PDF
                 </button>
                 <button
-                  onClick={() => {
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
                     localStorage.setItem('resumeData', JSON.stringify(resumeData));
                     alert('Resume saved!');
                   }}
-                  className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-card hover:bg-card/80 text-text rounded-lg transition-all"
+                  className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-card hover:bg-card/80 text-text rounded-lg transition-all relative z-20 cursor-pointer"
+                  type="button"
                 >
                   <Save className="w-5 h-5" />
                   Save Resume
                 </button>
               </div>
 
-              <div className="mt-6 p-4 bg-card/50 rounded-lg">
+              <div className="mt-6 p-4 bg-card/50 rounded-lg relative z-10">
                 <h3 className="text-section mb-2">Templates</h3>
                 <div className="space-y-2">
                   {['modern', 'classic', 'creative'].map((template) => (
                     <button
                       key={template}
-                      onClick={() => setSelectedTemplate(template)}
-                      className={`w-full text-left px-3 py-2 rounded ${
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        setSelectedTemplate(template);
+                      }}
+                      className={`w-full text-left px-3 py-2 rounded relative z-20 cursor-pointer ${
                         selectedTemplate === template
                           ? 'bg-primary text-white'
                           : 'bg-card text-text hover:bg-card/80'
                       }`}
+                      type="button"
                     >
                       {template.charAt(0).toUpperCase() + template.slice(1)}
                     </button>

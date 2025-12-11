@@ -9,7 +9,7 @@ import { useAuth } from '@/contexts/AuthContext';
 const menuItems = [
   { icon: Home, label: 'Dashboard', path: '/dashboard' },
   { icon: BookOpen, label: 'Learning', path: '/learning' },
-  { icon: Code, label: 'Simulator', path: '/simulator' },
+  { icon: Code, label: 'Code Editor', path: '/simulator' },
   { icon: FlaskConical, label: 'Projects', path: '/projects' },
   { icon: MessageSquare, label: 'Mentor', path: '/mentor' },
   { icon: Trophy, label: 'Leaderboard', path: '/leaderboard' },

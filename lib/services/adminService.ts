@@ -369,6 +369,133 @@ export const adminService = {
         return bDate - aDate;
       });
   },
+
+  // ===== Simulator Assignments =====
+  async getModuleSimulators(moduleId: string) {
+    try {
+      const isInitialized = await ensureFirebase();
+      if (!isInitialized || !db) return [];
+
+      const moduleRef = doc(db, 'modules', moduleId);
+      const moduleSnap = await getDoc(moduleRef);
+      
+      if (!moduleSnap.exists()) return [];
+      
+      const moduleData = moduleSnap.data();
+      return Array.isArray(moduleData.simulators) ? moduleData.simulators : [];
+    } catch (error) {
+      console.error('Error fetching module simulators:', error);
+      return [];
+    }
+  },
+
+  async assignSimulatorToModule(moduleId: string, simulatorType: string, order?: number) {
+    try {
+      await ensureFirebase();
+      if (!db) return;
+
+      const moduleRef = doc(db, 'modules', moduleId);
+      const moduleSnap = await getDoc(moduleRef);
+      
+      if (!moduleSnap.exists()) {
+        throw new Error('Module not found');
+      }
+
+      const moduleData = moduleSnap.data();
+      const simulators = Array.isArray(moduleData.simulators) ? moduleData.simulators : [];
+      
+      // Check if simulator already assigned
+      const existingIndex = simulators.findIndex((s: any) => s.type === simulatorType);
+      
+      if (existingIndex >= 0) {
+        // Update existing assignment
+        simulators[existingIndex] = {
+          type: simulatorType,
+          order: order ?? simulators[existingIndex].order ?? simulators.length,
+        };
+      } else {
+        // Add new assignment
+        simulators.push({
+          type: simulatorType,
+          order: order ?? simulators.length,
+        });
+      }
+
+      // Sort by order
+      simulators.sort((a: any, b: any) => (a.order || 0) - (b.order || 0));
+
+      await updateDoc(moduleRef, {
+        simulators,
+        updatedAt: serverTimestamp(),
+      });
+    } catch (error) {
+      console.error('Error assigning simulator to module:', error);
+      throw error;
+    }
+  },
+
+  async removeSimulatorFromModule(moduleId: string, simulatorType: string) {
+    try {
+      await ensureFirebase();
+      if (!db) return;
+
+      const moduleRef = doc(db, 'modules', moduleId);
+      const moduleSnap = await getDoc(moduleRef);
+      
+      if (!moduleSnap.exists()) {
+        throw new Error('Module not found');
+      }
+
+      const moduleData = moduleSnap.data();
+      const simulators = Array.isArray(moduleData.simulators) 
+        ? moduleData.simulators.filter((s: any) => s.type !== simulatorType)
+        : [];
+
+      await updateDoc(moduleRef, {
+        simulators,
+        updatedAt: serverTimestamp(),
+      });
+    } catch (error) {
+      console.error('Error removing simulator from module:', error);
+      throw error;
+    }
+  },
+
+  async updateSimulatorOrder(moduleId: string, simulatorType: string, newOrder: number) {
+    try {
+      await ensureFirebase();
+      if (!db) return;
+
+      const moduleRef = doc(db, 'modules', moduleId);
+      const moduleSnap = await getDoc(moduleRef);
+      
+      if (!moduleSnap.exists()) {
+        throw new Error('Module not found');
+      }
+
+      const moduleData = moduleSnap.data();
+      const simulators = Array.isArray(moduleData.simulators) ? [...moduleData.simulators] : [];
+      
+      const index = simulators.findIndex((s: any) => s.type === simulatorType);
+      if (index >= 0) {
+        simulators[index] = {
+          ...simulators[index],
+          order: newOrder,
+        };
+        
+        // Sort by order
+        simulators.sort((a: any, b: any) => (a.order || 0) - (b.order || 0));
+
+        await updateDoc(moduleRef, {
+          simulators,
+          updatedAt: serverTimestamp(),
+        });
+      }
+    } catch (error) {
+      console.error('Error updating simulator order:', error);
+      throw error;
+    }
+  },
 };
 
 export type AdminService = typeof adminService;

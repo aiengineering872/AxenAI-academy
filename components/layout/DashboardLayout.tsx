@@ -10,9 +10,25 @@ import { Settings, Loader2 } from 'lucide-react';
 const formatPathname = (pathname: string) => {
   if (!pathname || pathname === '/') return 'Dashboard';
   const parts = pathname.replace(/^\//, '').split('/');
+  
+  // Map specific paths to custom titles
+  const pathMap: Record<string, string> = {
+    'simulator': 'Code Editor',
+    'practice-tests': 'Practice Tests',
+    'learning': 'Learning Hub',
+    'resume-builder': 'Resume Builder',
+    'api-integration': 'API Integration',
+  };
+  
   return parts
-    .map((part) => part.replace(/-/g, ' '))
-    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .map((part) => {
+      // Check if we have a custom mapping
+      if (pathMap[part]) {
+        return pathMap[part];
+      }
+      // Otherwise, format normally
+      return part.replace(/-/g, ' ').charAt(0).toUpperCase() + part.slice(1);
+    })
     .join(' › ');
 };
 

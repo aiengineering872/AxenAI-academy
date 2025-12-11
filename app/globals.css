@@ -170,7 +170,7 @@ body::after {
 
 /* Glass morphism effect */
 .glass {
-  background: rgba(26, 31, 58, 0.6);
+  background: #000000;
   backdrop-filter: blur(16px) saturate(180%);
   border: 1px solid rgba(255, 255, 255, 0.1);
   box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.5);
@@ -180,7 +180,7 @@ body::after {
 
 /* Enhanced glass on hover */
 .glass:hover {
-  background: rgba(26, 31, 58, 0.8);
+  background: #000000;
   border-color: rgba(255, 107, 53, 0.3);
   transition: all 0.3s ease;
 }
