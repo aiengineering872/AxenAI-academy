@@ -15,9 +15,7 @@ const subjects = [
 
 const simulators: Record<string, Array<{ id: string; name: string; description: string; icon: any }>> = {
   python: [
-    { id: 'python-basics', name: 'Python Basics', description: 'Learn Python fundamentals with interactive 3D visualizations', icon: Code },
-    { id: 'data-structures', name: 'Data Structures', description: 'Visualize arrays, lists, and trees in 3D', icon: Code },
-    { id: 'algorithms', name: 'Algorithms', description: 'Step through sorting and searching algorithms', icon: Code },
+    { id: 'pandas-dataframe', name: 'Pandas DataFrame Simulator', description: 'Visualize how Pandas creates, filters, groups, and transforms DataFrames', icon: Code },
   ],
   'machine-learning': [
     { id: 'linear-regression', name: 'Linear Regression', description: 'Visualize regression models in 3D space', icon: Brain },

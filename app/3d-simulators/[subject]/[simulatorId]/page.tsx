@@ -11,6 +11,30 @@ const MLSimulator = dynamic(() => import('./MLSimulator'), {
   ssr: false,
 });
 
+const CNNSimulator = dynamic(() => import('./CNNSimulator'), {
+  ssr: false,
+});
+
+const ANNSimulator = dynamic(() => import('./ANNSimulator'), {
+  ssr: false,
+});
+
+const PythonSimulator = dynamic(() => import('./PythonSimulator'), {
+  ssr: false,
+});
+
+const PythonMemorySimulator = dynamic(() => import('./PythonMemorySimulator'), {
+  ssr: false,
+});
+
+const PromptEngineeringSimulator = dynamic(() => import('./PromptEngineeringSimulator'), {
+  ssr: false,
+});
+
+const RAGSimulator = dynamic(() => import('./RAGSimulator'), {
+  ssr: false,
+});
+
 const subjects = [
   { id: 'python', name: 'Python', icon: Code },
   { id: 'machine-learning', name: 'Machine Learning', icon: Brain },
@@ -91,13 +115,34 @@ export default function SimulatorPage() {
               return <Icon className="w-8 h-8 text-primary" />;
             })()}
             <h1 className="text-2xl font-bold text-text">
-              {simulatorId.split('-').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')} Simulator
+              {simulatorId === 'ann'
+                ? 'ANN'
+                : simulatorId === 'prompt-engineering'
+                ? 'Prompt Engineering'
+                : simulatorId === 'rag-pipeline'
+                ? 'RAG Pipeline'
+                : simulatorId === 'python-memory'
+                ? 'Python Memory & Variable Flow'
+                : simulatorId.split('-').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')}
+              {' '}Simulator
             </h1>
           </div>
 
           <div className="space-y-4">
             {subjectId === 'machine-learning' ? (
               <MLSimulator />
+            ) : subjectId === 'deep-learning' && simulatorId === 'cnn' ? (
+              <CNNSimulator />
+            ) : subjectId === 'deep-learning' && simulatorId === 'ann' ? (
+              <ANNSimulator />
+            ) : subjectId === 'python' && simulatorId === 'python-memory' ? (
+              <PythonMemorySimulator />
+            ) : subjectId === 'python' && (simulatorId === 'pandas-dataframe' || simulatorId === 'python-basics' || simulatorId === 'data-structures' || simulatorId === 'algorithms') ? (
+              <PythonSimulator />
+            ) : subjectId === 'genai' && simulatorId === 'prompt-engineering' ? (
+              <PromptEngineeringSimulator />
+            ) : subjectId === 'genai' && simulatorId === 'rag-pipeline' ? (
+              <RAGSimulator />
             ) : (
               <div className="bg-black rounded-lg border border-primary/20 p-6 min-h-[400px] flex items-center justify-center">
                 <div className="text-center">
@@ -120,5 +165,4 @@ export default function SimulatorPage() {
     </DashboardLayout>
   );
 }
-
 
