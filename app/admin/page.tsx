@@ -5,7 +5,7 @@ import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
-import { Users, BookOpen, FlaskConical, MessageSquare, Plus, Edit, Trash2, TrendingUp, Clock, ChevronDown, ListChecks, FileText } from 'lucide-react';
+import { Users, BookOpen, FlaskConical, MessageSquare, Plus, Edit, Trash2, TrendingUp, Clock, ChevronDown, ListChecks, FileText, X } from 'lucide-react';
 import { adminService } from '@/lib/services/adminService';
 import CourseModal from '@/components/admin/CourseModal';
 import ProjectModal from '@/components/admin/ProjectModal';
@@ -231,8 +231,9 @@ export default function AdminPanelPage() {
       if (activeTab === 'subjects') {
         await syncCoursesFromLearningHub();
         
+        // Load all subjects (no filtering by course)
         const [subjectsData, coursesData] = await Promise.all([
-          adminService.getModules(selectedCourseId || undefined),
+          adminService.getModules(),
           adminService.getCourses(),
         ]);
         setSubjects(subjectsData);
@@ -244,10 +245,9 @@ export default function AdminPanelPage() {
         const coursesData = await adminService.getCourses();
         setCourses(coursesData);
         
-        if (selectedCourseId) {
-          const subjectsData = await adminService.getModules(selectedCourseId);
-          setSubjects(subjectsData);
-        }
+        // Load all subjects - filtering will be done in the UI
+        const allSubjectsData = await adminService.getModules();
+        setSubjects(allSubjectsData);
         
         if (selectedSubjectId) {
           const subjectData = await adminService.getModule(selectedSubjectId) as any;
@@ -707,24 +707,6 @@ export default function AdminPanelPage() {
               <h2 className="text-xl font-bold text-text">Subjects</h2>
               
               <div className="flex items-center gap-3">
-                <div className="relative">
-                  <select
-                    value={selectedCourseId}
-                    onChange={(e) => {
-                      setSelectedCourseId(e.target.value);
-                    }}
-                    className="appearance-none rounded-lg border border-card bg-card px-4 py-2 pr-10 text-text focus:outline-none focus:ring-2 focus:ring-primary"
-                  >
-                    <option value="">Select Course</option>
-                    {courses.map((course) => (
-                      <option key={course.id} value={course.id}>
-                        {course.title}
-                      </option>
-                    ))}
-                  </select>
-                  <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-textSecondary" />
-                </div>
-
                 <button
                   type="button"
                   onClick={(e) => {
@@ -736,31 +718,17 @@ export default function AdminPanelPage() {
                       return;
                     }
                     
-                    if (!selectedCourseId) {
-                      alert('Please select a course first');
-                      return;
-                    }
-                    
                     setEditingSubject(null);
+                    (window as any).__preselectedCourseIds = undefined;
                     setShowSubjectModal(true);
                   }}
                   className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-white transition hover:bg-primary/90 relative z-10 cursor-pointer"
-                  style={{ 
-                    pointerEvents: 'auto',
-                    opacity: courses.length > 0 && selectedCourseId ? 1 : 0.5,
-                  }}
                 >
                   <Plus className="h-5 w-5" />
                   Add Subject
                 </button>
               </div>
             </div>
-            
-            {selectedCourseId && (
-              <p className="text-sm text-textSecondary">
-                Showing subjects for: <span className="font-medium text-text">{courses.find(c => c.id === selectedCourseId)?.title || 'Unknown'}</span>
-              </p>
-            )}
 
             {!loading && courses.length === 0 && (
               <p className="rounded-lg bg-card/60 p-4 text-sm text-textSecondary">
@@ -774,14 +742,27 @@ export default function AdminPanelPage() {
               <div className="glass rounded-xl p-6">
                 <div className="space-y-4">
                   {subjects.map((subject) => {
-                    const course = courses.find((courseItem) => courseItem.id === subject.courseId);
+                    // Display applicableCourses or backward compatibility with courseId
+                    let courseNames = 'Unassigned';
+                    if (subject.applicableCourses && Array.isArray(subject.applicableCourses)) {
+                      const courseLabels = subject.applicableCourses.map((courseId: string) => {
+                        if (courseId === 'AIML') return 'AIML';
+                        if (courseId === 'AI_ENGINEERING') return 'AI Engineering';
+                        return courseId;
+                      });
+                      courseNames = courseLabels.join(', ');
+                    } else if (subject.courseId) {
+                      // Backward compatibility
+                      const course = courses.find(c => c.id === subject.courseId);
+                      courseNames = course?.title || 'Unassigned';
+                    }
                     
                     return (
                       <div key={subject.id} className="flex items-center justify-between rounded-lg bg-card/50 p-4 transition hover:bg-card">
                         <div>
                           <h3 className="font-medium text-text">{subject.title}</h3>
                           <p className="text-sm text-textSecondary">
-                            {course?.title ?? 'Unassigned'} • {subject.difficulty} • {subject.duration}
+                            {courseNames} • {subject.difficulty} • {subject.duration}
                           </p>
                         </div>
                         <div className="flex items-center gap-2">
@@ -802,12 +783,8 @@ export default function AdminPanelPage() {
                     );
                   })}
 
-                  {subjects.length === 0 && selectedCourseId && (
-                    <div className="py-8 text-center text-textSecondary">No subjects yet for this course. Click "Add Subject" to create one.</div>
-                  )}
-                  
-                  {subjects.length === 0 && !selectedCourseId && (
-                    <div className="py-8 text-center text-textSecondary">Please select a course to view its subjects.</div>
+                  {subjects.length === 0 && (
+                    <div className="py-8 text-center text-textSecondary">No subjects yet. Click "Add Subject" to create one.</div>
                   )}
                 </div>
               </div>
@@ -826,12 +803,16 @@ export default function AdminPanelPage() {
               <label className="mb-2 block text-sm font-medium text-textSecondary">Select Course</label>
               <select
                 value={selectedCourseId}
-                onChange={(e) => {
-                  setSelectedCourseId(e.target.value);
+                onChange={async (e) => {
+                  const courseId = e.target.value;
+                  setSelectedCourseId(courseId);
                   setSelectedSubjectId('');
                   setSelectedModuleId('');
                   setSubjectModules([]);
                   setTopics([]);
+                  // Load all subjects when course changes
+                  const allSubjectsData = await adminService.getModules();
+                  setSubjects(allSubjectsData);
                 }}
                 className="w-full rounded-lg border border-card bg-card px-4 py-2 text-text focus:outline-none focus:ring-2 focus:ring-primary"
               >
@@ -870,7 +851,27 @@ export default function AdminPanelPage() {
                 >
                   <option value="">Select Subject</option>
                   {subjects
-                    .filter((s) => s.courseId === selectedCourseId)
+                    .filter((s) => {
+                      // Get course identifier for filtering
+                      const selectedCourse = courses.find(c => c.id === selectedCourseId);
+                      let courseIdentifier = selectedCourseId; // Fallback
+                      if (selectedCourse) {
+                        const title = (selectedCourse.title as string)?.toLowerCase() || '';
+                        if (title.includes('aiml') || title.includes('ai/ml') || title.includes('ai & ml')) {
+                          courseIdentifier = 'AIML';
+                        } else if (title.includes('ai engineering')) {
+                          courseIdentifier = 'AI_ENGINEERING';
+                        }
+                      }
+                      
+                      // Check new applicableCourses array format
+                      if (Array.isArray(s.applicableCourses) && s.applicableCourses.includes(courseIdentifier)) {
+                        return true;
+                      }
+                      // Backward compatibility: check old courseId field
+                      if (s.courseId === selectedCourseId) return true;
+                      return false;
+                    })
                     .map((subject) => (
                       <option key={subject.id} value={subject.id}>
                         {subject.title}
@@ -890,14 +891,21 @@ export default function AdminPanelPage() {
                     const moduleId = e.target.value;
                     setSelectedModuleId(moduleId);
                     if (moduleId && selectedSubjectId) {
-                      const subjectData = await adminService.getModule(selectedSubjectId) as any;
-                      if (subjectData?.modules) {
-                        const module = subjectData.modules.find((m: any) => m.id === moduleId);
-                        if (module?.topics) {
-                          setTopics(module.topics);
+                      try {
+                        const subjectData = await adminService.getModule(selectedSubjectId) as any;
+                        if (subjectData?.modules && Array.isArray(subjectData.modules)) {
+                          const module = subjectData.modules.find((m: any) => m.id === moduleId);
+                          if (module?.topics && Array.isArray(module.topics)) {
+                            setTopics(module.topics);
+                          } else {
+                            setTopics([]);
+                          }
                         } else {
                           setTopics([]);
                         }
+                      } catch (error) {
+                        console.error('Error loading topics:', error);
+                        setTopics([]);
                       }
                     } else {
                       setTopics([]);
@@ -922,6 +930,10 @@ export default function AdminPanelPage() {
                   <h3 className="text-lg font-semibold text-text">Topics</h3>
                   <button
                     onClick={() => {
+                      if (!selectedModuleId || !selectedSubjectId) {
+                        alert('Please select a module first.');
+                        return;
+                      }
                       setEditingTopic(null);
                       setShowTopicModal(true);
                     }}
@@ -1552,9 +1564,11 @@ export default function AdminPanelPage() {
           onClose={() => {
             setShowSubjectModal(false);
             setEditingSubject(null);
+            (window as any).__preselectedCourseIds = undefined;
           }}
           onSuccess={() => {
             void loadData();
+            (window as any).__preselectedCourseIds = undefined;
           }}
           subject={editingSubject}
           courses={courses}
@@ -1562,42 +1576,49 @@ export default function AdminPanelPage() {
         />
 
         <TopicModal
-          isOpen={showTopicModal}
+          isOpen={showTopicModal && !!selectedModuleId && !!selectedSubjectId}
           onClose={() => {
             setShowTopicModal(false);
             setEditingTopic(null);
           }}
           onSuccess={async () => {
             // Reload subject data after save to ensure modules are preserved
-            if (selectedSubjectId) {
-              const subjectData = await adminService.getModule(selectedSubjectId) as any;
-              console.log('Reloading after topic save - Subject data:', subjectData);
-              console.log('Reloading after topic save - Modules:', subjectData?.modules);
-              
-              if (subjectData?.modules && Array.isArray(subjectData.modules)) {
-                // Update subjectModules to reflect any changes
-                setSubjectModules(subjectData.modules);
+            if (selectedSubjectId && selectedModuleId) {
+              try {
+                const subjectData = await adminService.getModule(selectedSubjectId) as any;
+                console.log('Reloading after topic save - Subject data:', subjectData);
+                console.log('Reloading after topic save - Modules:', subjectData?.modules);
                 
-                // Update topics for selected module
-                if (selectedModuleId) {
+                if (subjectData?.modules && Array.isArray(subjectData.modules)) {
+                  // Update subjectModules to reflect any changes
+                  setSubjectModules(subjectData.modules);
+                  
+                  // Update topics for selected module
                   const module = subjectData.modules.find((m: any) => m.id === selectedModuleId);
-                  if (module?.topics) {
+                  if (module?.topics && Array.isArray(module.topics)) {
                     setTopics(module.topics);
+                    console.log('Topics reloaded:', module.topics.length);
                   } else {
                     setTopics([]);
+                    console.log('No topics found in module');
                   }
+                } else {
+                  console.warn('No modules found after topic save!');
+                  setSubjectModules([]);
+                  setTopics([]);
                 }
-              } else {
-                console.warn('No modules found after topic save!');
-                setSubjectModules([]);
-                setTopics([]);
+              } catch (error) {
+                console.error('Error reloading topics:', error);
+                // Still try to reload all data
+                void loadData();
               }
             }
+            // Always reload all data to ensure consistency
             void loadData();
           }}
           topic={editingTopic}
-          moduleId={selectedModuleId}
-          subjectId={selectedSubjectId}
+          moduleId={selectedModuleId || ''}
+          subjectId={selectedSubjectId || ''}
         />
 
         <QuizModal

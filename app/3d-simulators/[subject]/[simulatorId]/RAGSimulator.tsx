@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Upload, FileText, Search, Layers, ArrowRight, Download, Copy,
-  ChevronRight, ChevronLeft, Settings, Info, Sparkles, Database
+  ChevronRight, ChevronLeft, Settings, Info, Sparkles, Database, Send
 } from 'lucide-react';
 import {
   chunkText,
@@ -132,6 +132,7 @@ export default function RAGSimulator() {
   const [pdfjsLib, setPdfjsLib] = useState<any>(null);
   const [pdfjsLoading, setPdfjsLoading] = useState(false);
   const [pdfjsError, setPdfjsError] = useState<string | null>(null);
+  const [documentSubmitted, setDocumentSubmitted] = useState(false);
 
   // Load PDF.js library on component mount
   useEffect(() => {
@@ -167,43 +168,60 @@ export default function RAGSimulator() {
     { id: 5, name: 'LLM Output', icon: Sparkles },
   ];
 
-  // Chunk document when text or parameters change
-  useEffect(() => {
+  // Handle document submit
+  const handleDocumentSubmit = () => {
     if (documentText.trim()) {
+      setDocumentSubmitted(true);
+    }
+  };
+
+  // Chunk document when submitted and text or parameters change (real-time chunking)
+  useEffect(() => {
+    if (documentSubmitted && documentText.trim()) {
+      // Recalculate chunks in real-time when parameters change
       const newChunks = chunkText(documentText, chunkSize, overlap);
       setChunks(newChunks);
+      // Reset embeddings so they regenerate with new chunks
       setEmbeddingsGenerated(false);
       setSearchResults([]);
       setLlmOutput('');
+      setContextPrompt('');
       setCurrentStep(1);
-    } else {
+    } else if (!documentText.trim()) {
       setChunks([]);
       setEmbeddingsGenerated(false);
       setSearchResults([]);
+      setLlmOutput('');
+      setContextPrompt('');
       setCurrentStep(0);
+      setDocumentSubmitted(false);
     }
-  }, [documentText, chunkSize, overlap]);
+  }, [documentSubmitted, documentText, chunkSize, overlap]);
 
-  // Generate embeddings when chunks are ready
+  // Generate embeddings when chunks are ready (real-time update)
   useEffect(() => {
-    if (chunks.length > 0 && !embeddingsGenerated) {
+    if (chunks.length > 0 && documentSubmitted && !embeddingsGenerated) {
+      // Generate embeddings for chunks that don't have them yet
       const chunksWithEmbeddings = generateChunkEmbeddings(chunks, EMBEDDING_DIMENSIONS);
       setChunks(chunksWithEmbeddings);
       setEmbeddingsGenerated(true);
       setCurrentStep(2);
     }
-  }, [chunks.length, embeddingsGenerated]);
+  }, [chunks.length, documentSubmitted, embeddingsGenerated]);
 
-  // Perform search when query changes
+  // Generate embeddings when chunks are ready (handled in the chunking effect above)
+
+  // Perform search when query changes (real-time updates)
   useEffect(() => {
     if (query.trim() && chunks.length > 0 && embeddingsGenerated) {
       const results = searchChunks(query, chunks, topK);
       setSearchResults(results);
       setCurrentStep(3);
       
-      // Generate LLM output if we have results
+      // Generate LLM output if we have results (updates in real-time)
       if (results.length > 0) {
         const retrievedChunks = results.map(r => r.chunk);
+        // Regenerate output when query, chunks, creativity, or verbosity changes
         const output = generateMockLLMResponse(query, retrievedChunks, creativity, verbosity);
         setLlmOutput(output);
         setCurrentStep(5);
@@ -409,37 +427,31 @@ export default function RAGSimulator() {
                   <FileText size={24} />
                   Document Input
                 </h2>
-                <div className="flex items-center gap-2">
-                  <label className="flex items-center gap-2 px-4 py-2 bg-black/50 hover:bg-black/70 rounded-lg cursor-pointer transition-colors text-text">
-                    <Upload size={18} />
-                    <span>Upload</span>
-                    <input
-                      type="file"
-                      accept=".txt,.md,.pdf"
-                      onChange={handleFileUpload}
-                      className="hidden"
-                      disabled={pdfjsLoading}
-                    />
-                  </label>
-                  {pdfjsLoading && (
-                    <span className="text-xs text-textSecondary">Loading PDF.js...</span>
-                  )}
-                  {pdfjsError && (
-                    <span className="text-xs text-red-400">PDF.js unavailable</span>
-                  )}
-                </div>
               </div>
               
               <textarea
                 value={documentText}
-                onChange={(e) => setDocumentText(e.target.value)}
-                placeholder="Paste your document text here or upload a file (TXT, MD, or PDF)..."
+                onChange={(e) => {
+                  setDocumentText(e.target.value);
+                  setDocumentSubmitted(false); // Reset submission when text changes
+                }}
+                placeholder="Paste your document text here..."
                 className="w-full bg-black/50 border border-primary/20 rounded-lg p-4 text-text placeholder-textSecondary focus:outline-none focus:border-primary min-h-[200px]"
               />
               
-              <div className="mt-4 flex justify-between text-sm text-textSecondary">
-                <span>{documentText.split(/\s+/).length} words</span>
-                <span>{documentText.length} characters</span>
+              <div className="mt-4 flex items-center justify-between">
+                <div className="flex gap-4 text-sm text-textSecondary">
+                  <span>{documentText.split(/\s+/).length} words</span>
+                  <span>{documentText.length} characters</span>
+                </div>
+                <button
+                  onClick={handleDocumentSubmit}
+                  disabled={!documentText.trim()}
+                  className="flex items-center gap-2 px-6 py-2 bg-primary hover:bg-primary/90 text-white rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed font-medium"
+                >
+                  <Send size={18} />
+                  <span>Send</span>
+                </button>
               </div>
             </div>
 
@@ -697,13 +709,13 @@ export default function RAGSimulator() {
               </div>
             )}
 
-            {/* Mock LLM Output */}
+            {/* LLM Output */}
             {llmOutput && (
               <div className="bg-card/50 backdrop-blur rounded-lg border border-primary/20 p-6">
                 <div className="flex items-center justify-between mb-4">
                   <h2 className="text-2xl font-bold flex items-center gap-2 text-text">
                     <Sparkles size={24} />
-                    Mock LLM Output
+                    LLM Output
                   </h2>
                   <button
                     onClick={() => copyToClipboard(llmOutput)}

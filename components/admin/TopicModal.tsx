@@ -37,6 +37,8 @@ export const TopicModal: React.FC<TopicModalProps> = ({
   const [pptFile, setPptFile] = useState<File | null>(null);
   const [pptUploading, setPptUploading] = useState(false);
   const [pptUploadProgress, setPptUploadProgress] = useState(0);
+  const [uploadedFileName, setUploadedFileName] = useState<string | null>(null);
+  const [uploadSuccess, setUploadSuccess] = useState(false);
   const isEditMode = Boolean(topic);
 
   useEffect(() => {
@@ -46,6 +48,8 @@ export const TopicModal: React.FC<TopicModalProps> = ({
       setPptFile(null);
       setPptUploading(false);
       setPptUploadProgress(0);
+      setUploadedFileName(null);
+      setUploadSuccess(false);
       return;
     }
 
@@ -58,6 +62,11 @@ export const TopicModal: React.FC<TopicModalProps> = ({
         pptUrl: topic.pptUrl ?? '',
         googleColabUrl: topic.googleColabUrl ?? '',
       });
+      // If topic has a PPT URL, show it as uploaded
+      if (topic.pptUrl) {
+        setUploadedFileName(topic.pptTitle || 'PPT File');
+        setUploadSuccess(true);
+      }
     } else {
       setFormData(defaultForm);
     }
@@ -104,9 +113,15 @@ export const TopicModal: React.FC<TopicModalProps> = ({
       });
 
       setFormData((prev) => ({ ...prev, pptUrl: downloadUrl }));
+      setUploadedFileName(pptFile.name);
+      setUploadSuccess(true);
       setPptFile(null);
       setPptUploadProgress(100);
-      alert('PPT uploaded successfully! Link has been attached to this topic.');
+      
+      // Clear success message after 5 seconds
+      setTimeout(() => {
+        setUploadSuccess(false);
+      }, 5000);
     } catch (error: any) {
       console.error('Error uploading PPT:', error);
       const message =
@@ -131,12 +146,23 @@ export const TopicModal: React.FC<TopicModalProps> = ({
       return;
     }
 
+    if (!moduleId || !subjectId) {
+      alert('Module ID or Subject ID is missing. Please select a module first.');
+      return;
+    }
+
     setLoading(true);
     try {
       // Get current subject data
       const subjectData: any = await adminService.getModule(subjectId);
       if (!subjectData?.modules) {
         throw new Error('Subject or modules not found');
+      }
+
+      // Verify the module exists
+      const moduleExists = subjectData.modules.some((m: any) => m.id === moduleId);
+      if (!moduleExists) {
+        throw new Error(`Module with ID ${moduleId} not found in subject`);
       }
 
       // Preserve all module data including IDs, numbers, names, orders
@@ -147,6 +173,7 @@ export const TopicModal: React.FC<TopicModalProps> = ({
 
           if (isEditMode && topic?.id) {
             // Update existing topic
+            // CRITICAL: Always preserve googleColabUrl from existing topic if not being updated
             updatedTopics = topics.map((t: any) =>
               t.id === topic.id
                 ? {
@@ -156,10 +183,11 @@ export const TopicModal: React.FC<TopicModalProps> = ({
                     order: formData.order,
                     pptTitle: formData.pptTitle,
                     pptUrl: formData.pptUrl,
-                    googleColabUrl: formData.googleColabUrl,
+                    // CRITICAL: Preserve googleColabUrl - use formData if provided, otherwise keep existing
+                    googleColabUrl: formData.googleColabUrl || t.googleColabUrl || '',
                   }
                 : {
-                    // Preserve all topic fields
+                    // Preserve all topic fields - never remove googleColabUrl
                     id: t.id || `topic-${index}-${Date.now()}`,
                     name: t.name || '',
                     content: t.content || '',
@@ -212,21 +240,23 @@ export const TopicModal: React.FC<TopicModalProps> = ({
         };
       });
 
-      // Preserve all subject fields
+      // Preserve ALL subject fields - merge with existing data to prevent data loss
       const dataToSave = {
+        ...subjectData, // Preserve all existing fields first
         title: subjectData.title || '',
         description: subjectData.description || '',
         duration: subjectData.duration || '',
         difficulty: subjectData.difficulty || 'beginner',
-        courseId: subjectData.courseId || '',
+        applicableCourses: subjectData.applicableCourses || [], // Preserve applicableCourses
         order: subjectData.order ?? 0,
-        modules: updatedModules, // Always include modules array
+        modules: updatedModules, // Always include modules array with all fields preserved
       };
 
       console.log('Saving topic - Modules count:', updatedModules.length);
       console.log('Saving topic - Modules:', updatedModules);
       console.log('Saving topic - Data to save:', dataToSave);
 
+      // Use updateModule which now properly merges data
       await adminService.updateModule(subjectId, dataToSave);
       
       // Verify the save by reading it back
@@ -246,8 +276,12 @@ export const TopicModal: React.FC<TopicModalProps> = ({
         console.warn('Expected:', updatedModules.length, 'Got:', verifyData.modules.length);
       }
 
+      // Call onSuccess before closing to trigger reload
       onSuccess();
-      onClose();
+      // Small delay to ensure state updates
+      setTimeout(() => {
+        onClose();
+      }, 100);
     } catch (error) {
       console.error('Error saving topic:', error);
       alert(`Failed to save topic: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -327,47 +361,114 @@ export const TopicModal: React.FC<TopicModalProps> = ({
               <input
                 type="url"
                 value={formData.pptUrl}
-                onChange={(event) => handleChange('pptUrl', event.target.value)}
+                onChange={(event) => {
+                  handleChange('pptUrl', event.target.value);
+                  // Clear upload success when manually editing URL
+                  if (event.target.value !== formData.pptUrl) {
+                    setUploadSuccess(false);
+                    setUploadedFileName(null);
+                  }
+                }}
                 className="w-full rounded-lg border border-card bg-card px-4 py-3 text-text focus:outline-none focus:ring-2 focus:ring-primary"
-                placeholder="https://..."
+                placeholder="https://drive.google.com/file/d/..."
               />
               <p className="mt-1 text-xs text-textSecondary">
                 Provide a publicly accessible PPT link (Google Slides, OneDrive, etc.)
               </p>
+              
+              {/* Show uploaded file info if URL exists */}
+              {formData.pptUrl && !pptUploading && (
+                <div className="mt-3 p-3 rounded-lg bg-green-500/10 border border-green-500/30">
+                  <div className="flex items-center gap-2">
+                    <div className="h-2 w-2 rounded-full bg-green-500"></div>
+                    <p className="text-sm font-medium text-green-400">
+                      {uploadedFileName ? `File uploaded: ${uploadedFileName}` : 'PPT link is set'}
+                    </p>
+                  </div>
+                  <p className="text-xs text-textSecondary mt-1 break-all">
+                    URL: {formData.pptUrl.substring(0, 60)}...
+                  </p>
+                </div>
+              )}
+
               <div className="mt-4 space-y-3">
                 <label className="block text-sm font-medium text-textSecondary">
                   Or Upload PPT File
                 </label>
-                <input
-                  type="file"
-                  accept=".ppt,.pptx,.pdf"
-                  onChange={handlePptFileChange}
-                  className="w-full rounded-lg border border-dashed border-card bg-card/50 px-4 py-2 text-sm text-text"
-                />
+                
+                {/* File selection area */}
+                <div className="relative">
+                  <input
+                    type="file"
+                    accept=".ppt,.pptx,.pdf"
+                    onChange={handlePptFileChange}
+                    className="w-full rounded-lg border border-dashed border-card bg-card/50 px-4 py-3 text-sm text-text cursor-pointer hover:border-primary/50 transition-colors"
+                  />
+                  {pptFile && (
+                    <div className="mt-2 p-2 rounded-lg bg-primary/10 border border-primary/30">
+                      <p className="text-sm font-medium text-primary">
+                        ✓ Selected: {pptFile.name}
+                      </p>
+                      <p className="text-xs text-textSecondary">
+                        Size: {(pptFile.size / (1024 * 1024)).toFixed(2)} MB
+                      </p>
+                    </div>
+                  )}
+                </div>
+
+                {/* Upload button */}
                 <button
                   type="button"
                   onClick={handlePptUpload}
                   disabled={!pptFile || pptUploading}
-                  className="inline-flex items-center gap-2 rounded-lg border border-primary/50 bg-primary/10 px-4 py-2 text-sm font-semibold text-primary transition hover:bg-primary/20 disabled:cursor-not-allowed disabled:opacity-60"
+                  className="w-full inline-flex items-center justify-center gap-2 rounded-lg border border-primary/50 bg-primary/10 px-4 py-3 text-sm font-semibold text-primary transition hover:bg-primary/20 disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   <UploadCloud className="h-4 w-4" />
-                  {pptUploading ? 'Uploading...' : pptFile ? `Upload ${pptFile.name}` : 'Upload PPT'}
+                  {pptUploading ? (
+                    <span>Uploading... {pptUploadProgress}%</span>
+                  ) : pptFile ? (
+                    `Upload ${pptFile.name}`
+                  ) : (
+                    'Upload PPT'
+                  )}
                 </button>
+
+                {/* Upload progress */}
                 {pptUploading && (
-                  <div className="space-y-1">
-                    <div className="h-2 w-full rounded-full bg-card/50">
+                  <div className="space-y-2">
+                    <div className="h-3 w-full rounded-full bg-card/50 overflow-hidden">
                       <div
-                        className="h-2 rounded-full bg-primary transition-all"
+                        className="h-full rounded-full bg-gradient-to-r from-primary to-primary/80 transition-all duration-300 flex items-center justify-end pr-2"
                         style={{ width: `${pptUploadProgress}%` }}
-                      />
+                      >
+                        {pptUploadProgress > 10 && (
+                          <span className="text-xs text-white font-medium">{pptUploadProgress}%</span>
+                        )}
+                      </div>
                     </div>
-                    <p className="text-xs text-textSecondary">{pptUploadProgress}%</p>
+                    <p className="text-xs text-center text-textSecondary">
+                      Uploading your file to Firebase Storage...
+                    </p>
                   </div>
                 )}
-                {pptFile && !pptUploading && (
-                  <p className="text-xs text-textSecondary">
-                    Selected: {pptFile.name} ({(pptFile.size / (1024 * 1024)).toFixed(2)} MB)
-                  </p>
+
+                {/* Success message */}
+                {uploadSuccess && uploadedFileName && (
+                  <div className="p-3 rounded-lg bg-green-500/20 border border-green-500/40">
+                    <div className="flex items-center gap-2">
+                      <div className="h-5 w-5 rounded-full bg-green-500 flex items-center justify-center">
+                        <span className="text-white text-xs font-bold">✓</span>
+                      </div>
+                      <div>
+                        <p className="text-sm font-semibold text-green-400">
+                          Upload Successful!
+                        </p>
+                        <p className="text-xs text-textSecondary">
+                          {uploadedFileName} has been uploaded and linked to this topic.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
                 )}
               </div>
             </div>

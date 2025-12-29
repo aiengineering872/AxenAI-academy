@@ -23,7 +23,7 @@ const PythonSimulator = dynamic(() => import('./PythonSimulator'), {
   ssr: false,
 });
 
-const PythonMemorySimulator = dynamic(() => import('./PythonMemorySimulator'), {
+const PythonMemoryManagerSimulator = dynamic(() => import('./PythonMemoryManagerSimulator'), {
   ssr: false,
 });
 
@@ -45,60 +45,17 @@ const subjects = [
 export default function SimulatorPage() {
   const router = useRouter();
   const params = useParams();
-  const subjectId = params?.subject as string || 'python';
-  const simulatorId = params?.simulatorId as string || '';
+  // Access params directly - useParams() in client components is synchronous
+  const subjectId = (params?.subject as string) || 'python';
+  const simulatorId = (params?.simulatorId as string) || '';
   
   const currentSubject = subjects.find(s => s.id === subjectId) || subjects[0];
 
   return (
     <DashboardLayout>
-      <div className="flex gap-6 h-[calc(100vh-200px)]">
-        {/* Left Sidebar - Subject Navigation */}
-        <div className="w-64 flex flex-col gap-4">
-          <button
-            onClick={() => {
-              if (typeof window !== 'undefined') {
-                const returnUrl = sessionStorage.getItem('simulatorReturnUrl');
-                if (returnUrl) {
-                  router.push(returnUrl);
-                } else {
-                  router.back();
-                }
-              }
-            }}
-            className="inline-flex items-center gap-2 text-textSecondary hover:text-primary transition-colors bg-black rounded-lg border border-primary/20 p-3"
-          >
-            <ArrowLeft className="w-4 h-4" />
-            <span>Back to Topic</span>
-          </button>
-          <aside className="flex-1 bg-black rounded-lg border border-primary/20 p-4 overflow-y-auto">
-            <h3 className="text-lg font-semibold text-text mb-4 px-2">Subjects</h3>
-          <nav className="space-y-2">
-            {subjects.map((subject) => {
-              const Icon = subject.icon;
-              const isActive = subjectId === subject.id;
-              
-              return (
-                <div
-                  key={subject.id}
-                  onClick={() => router.push(`/3d-simulators/${subject.id}`)}
-                  className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all cursor-pointer ${
-                    isActive
-                      ? 'bg-primary/20 text-primary shadow-glow'
-                      : 'text-textSecondary hover:text-text hover:bg-card/50'
-                  }`}
-                >
-                  <Icon className="w-5 h-5" />
-                  <span className="font-medium">{subject.name}</span>
-                </div>
-              );
-            })}
-          </nav>
-        </aside>
-        </div>
-
-        {/* Main Content Area */}
-        <div className="flex-1 bg-black rounded-lg border border-primary/20 p-6 overflow-y-auto">
+      <div className="h-[calc(100vh-200px)]">
+        {/* Main Content Area - Full Width (No Sidebar) */}
+        <div className="bg-black rounded-lg border border-primary/20 p-6 overflow-y-auto h-full">
           <div className="mb-4">
             <Link 
               href={`/3d-simulators/${subjectId}`}
@@ -121,8 +78,8 @@ export default function SimulatorPage() {
                 ? 'Prompt Engineering'
                 : simulatorId === 'rag-pipeline'
                 ? 'RAG Pipeline'
-                : simulatorId === 'python-memory'
-                ? 'Python Memory & Variable Flow'
+                : simulatorId === 'python-memory-manager'
+                ? 'Python Memory Manager'
                 : simulatorId.split('-').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')}
               {' '}Simulator
             </h1>
@@ -135,8 +92,8 @@ export default function SimulatorPage() {
               <CNNSimulator />
             ) : subjectId === 'deep-learning' && simulatorId === 'ann' ? (
               <ANNSimulator />
-            ) : subjectId === 'python' && simulatorId === 'python-memory' ? (
-              <PythonMemorySimulator />
+            ) : subjectId === 'python' && simulatorId === 'python-memory-manager' ? (
+              <PythonMemoryManagerSimulator />
             ) : subjectId === 'python' && (simulatorId === 'pandas-dataframe' || simulatorId === 'python-basics' || simulatorId === 'data-structures' || simulatorId === 'algorithms') ? (
               <PythonSimulator />
             ) : subjectId === 'genai' && simulatorId === 'prompt-engineering' ? (

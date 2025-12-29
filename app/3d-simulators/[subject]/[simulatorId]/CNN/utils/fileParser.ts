@@ -5,17 +5,39 @@
 import { DataPoint } from '../types';
 
 /**
+ * Result type for file parsing
+ */
+export type ParseFileResult = 
+  | { data: DataPoint[]; error?: never }
+  | { data?: never; error: { message: string } };
+
+/**
+ * Type guard to check if result has error
+ */
+export function hasError(result: ParseFileResult): result is { data?: never; error: { message: string } } {
+  return 'error' in result && result.error !== undefined;
+}
+
+/**
  * Parses CSV or Excel file and extracts data points
  */
-export async function parseFile(file: File): Promise<DataPoint[]> {
+export async function parseFile(file: File): Promise<ParseFileResult> {
   const fileType = file.name.split('.').pop()?.toLowerCase();
   
+  try {
+    let data: DataPoint[];
+  
   if (fileType === 'csv') {
-    return parseCSV(file);
+      data = await parseCSV(file);
   } else if (fileType === 'xlsx' || fileType === 'xls') {
-    return parseExcel(file);
+      data = await parseExcel(file);
   } else {
-    throw new Error('Unsupported file format. Please upload a CSV or Excel file.');
+      return { error: { message: 'Unsupported file format. Please upload a CSV or Excel file.' } };
+    }
+    
+    return { data };
+  } catch (error: any) {
+    return { error: { message: error?.message || 'Failed to parse file.' } };
   }
 }
 

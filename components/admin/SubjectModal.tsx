@@ -18,6 +18,9 @@ interface Topic {
   name: string;
   content: string;
   order: number;
+  pptTitle?: string;
+  pptUrl?: string;
+  googleColabUrl?: string;
 }
 
 interface Module {
@@ -33,7 +36,7 @@ const defaultForm = {
   description: '',
   duration: '',
   difficulty: 'beginner',
-  courseId: '',
+  applicableCourses: [] as string[],
   order: 0,
 };
 
@@ -62,12 +65,30 @@ export const SubjectModal: React.FC<SubjectModalProps> = ({
     }
 
     if (subject) {
+      // Load applicableCourses array, with backward compatibility for old courseId field
+      let applicableCourses: string[] = [];
+      if (subject.applicableCourses && Array.isArray(subject.applicableCourses)) {
+        applicableCourses = subject.applicableCourses;
+      } else if (subject.courseId) {
+        // Backward compatibility: convert courseId to applicableCourses
+        // Map course ID to course identifier string
+        const course = courses.find(c => c.id === subject.courseId);
+        if (course) {
+          const courseTitle = course.title?.toLowerCase() || '';
+          if (courseTitle.includes('aiml') || courseTitle.includes('ai/ml') || courseTitle.includes('ai & ml')) {
+            applicableCourses = ['AIML'];
+          } else if (courseTitle.includes('ai engineering')) {
+            applicableCourses = ['AI_ENGINEERING'];
+          }
+        }
+      }
+      
       setFormData({
         title: subject.title ?? '',
         description: subject.description ?? '',
         duration: subject.duration ?? '',
         difficulty: subject.difficulty ?? 'beginner',
-        courseId: subject.courseId ?? preselectedCourseId ?? courses[0]?.id ?? '',
+        applicableCourses: applicableCourses,
         order: subject.order ?? 0,
       });
       
@@ -83,6 +104,10 @@ export const SubjectModal: React.FC<SubjectModalProps> = ({
             name: t.name || '',
             content: t.content || '',
             order: t.order ?? topicIndex,
+            // CRITICAL: Preserve ALL topic fields when loading to prevent data loss
+            pptTitle: t.pptTitle || '',
+            pptUrl: t.pptUrl || '',
+            googleColabUrl: t.googleColabUrl || '',
           })),
         }));
         setModules(loadedModules);
@@ -92,9 +117,28 @@ export const SubjectModal: React.FC<SubjectModalProps> = ({
         setModules([]);
       }
     } else {
+      // Check for preselected course IDs from course selection modal and convert to applicableCourses
+      const preselectedCourseIds = (window as any).__preselectedCourseIds || (preselectedCourseId ? [preselectedCourseId] : []);
+      let applicableCourses: string[] = [];
+      
+      if (preselectedCourseIds.length > 0) {
+        // Convert course IDs to applicableCourses strings
+        preselectedCourseIds.forEach((courseId: string) => {
+          const course = courses.find(c => c.id === courseId);
+          if (course) {
+            const courseTitle = course.title?.toLowerCase() || '';
+            if (courseTitle.includes('aiml') || courseTitle.includes('ai/ml') || courseTitle.includes('ai & ml')) {
+              if (!applicableCourses.includes('AIML')) applicableCourses.push('AIML');
+            } else if (courseTitle.includes('ai engineering')) {
+              if (!applicableCourses.includes('AI_ENGINEERING')) applicableCourses.push('AI_ENGINEERING');
+            }
+          }
+        });
+      }
+      
       setFormData({
         ...defaultForm,
-        courseId: preselectedCourseId ?? courses[0]?.id ?? '',
+        applicableCourses: applicableCourses,
         order: 0,
       });
       setModules([]);
@@ -104,12 +148,28 @@ export const SubjectModal: React.FC<SubjectModalProps> = ({
 
   const handleChange = (
     field: keyof typeof formData,
-    value: string | number
+    value: string | number | string[]
   ) => {
     setFormData((prev) => ({
       ...prev,
       [field]: value,
     }));
+  };
+
+  const handleCourseCheckboxChange = (courseIdentifier: string, checked: boolean) => {
+    setFormData((prev) => {
+      const currentCourses = prev.applicableCourses || [];
+      if (checked) {
+        // Add course if not already in array
+        if (!currentCourses.includes(courseIdentifier)) {
+          return { ...prev, applicableCourses: [...currentCourses, courseIdentifier] };
+        }
+      } else {
+        // Remove course from array
+        return { ...prev, applicableCourses: currentCourses.filter(id => id !== courseIdentifier) };
+      }
+      return prev;
+    });
   };
 
   const addModule = () => {
@@ -135,9 +195,23 @@ export const SubjectModal: React.FC<SubjectModalProps> = ({
 
   const updateModule = (moduleId: string, field: keyof Module, value: string | number) => {
     setModules(
-      modules.map((m) =>
-        m.id === moduleId ? { ...m, [field]: value } : m
-      )
+      modules.map((m) => {
+        if (m.id === moduleId) {
+          return { 
+            ...m, 
+            [field]: value,
+            // CRITICAL: Preserve all topics with their googleColabUrl intact when updating module fields
+            topics: (m.topics || []).map((t: Topic) => ({
+              ...t,
+              // Always preserve googleColabUrl, pptUrl, and pptTitle - never remove them
+              googleColabUrl: t.googleColabUrl ?? '',
+              pptUrl: t.pptUrl ?? '',
+              pptTitle: t.pptTitle ?? '',
+            })),
+          };
+        }
+        return m;
+      })
     );
   };
 
@@ -191,7 +265,16 @@ export const SubjectModal: React.FC<SubjectModalProps> = ({
           return {
             ...m,
             topics: m.topics.map((t) =>
-              t.id === topicId ? { ...t, [field]: value } : t
+              t.id === topicId 
+                ? { 
+                    ...t, 
+                    [field]: value,
+                    // CRITICAL: Always preserve googleColabUrl, pptUrl, and pptTitle - never remove them
+                    googleColabUrl: t.googleColabUrl ?? '',
+                    pptUrl: t.pptUrl ?? '',
+                    pptTitle: t.pptTitle ?? '',
+                  } 
+                : t
             ),
           };
         }
@@ -202,6 +285,12 @@ export const SubjectModal: React.FC<SubjectModalProps> = ({
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
+    
+    // Validate course selection - at least one course must be selected
+    if (!formData.applicableCourses || formData.applicableCourses.length === 0) {
+      alert('Please select at least one course (AIML or AI Engineering).');
+      return;
+    }
     
     // Validate modules - only require module number and name
     for (const module of modules) {
@@ -221,15 +310,20 @@ export const SubjectModal: React.FC<SubjectModalProps> = ({
         .map((m, index) => {
           try {
             // Safely process topics - preserve all topics, even if incomplete
-            let topicsToSave: any[] = [];
+            // CRITICAL: Preserve ALL topic fields including pptUrl, pptTitle, and googleColabUrl
+            let topicsToSave: Topic[] = [];
             if (Array.isArray(m.topics) && m.topics.length > 0) {
               topicsToSave = m.topics
-                .filter((t) => t) // Filter out null/undefined topics
-                .map((t) => ({
+                .filter((t): t is Topic => t !== null && t !== undefined) // Filter out null/undefined topics
+                .map((t): Topic => ({
                   id: t.id || `topic-${index}-${Date.now()}-${Math.random()}`,
                   name: t.name || '',
                   content: t.content || '',
                   order: t.order ?? 0,
+                  // Preserve PPT and Google Colab fields to prevent data loss
+                  pptTitle: t.pptTitle ?? '',
+                  pptUrl: t.pptUrl ?? '',
+                  googleColabUrl: t.googleColabUrl ?? '',
                 }));
             }
             
@@ -277,7 +371,12 @@ export const SubjectModal: React.FC<SubjectModalProps> = ({
       }
 
       const dataToSave = {
-        ...formData,
+        title: formData.title,
+        description: formData.description,
+        duration: formData.duration,
+        difficulty: formData.difficulty,
+        applicableCourses: formData.applicableCourses,
+        order: formData.order,
         modules: modulesToSave, // Always include modules array
       };
 
@@ -363,27 +462,31 @@ export const SubjectModal: React.FC<SubjectModalProps> = ({
 
           <div>
             <label className="mb-2 block text-sm font-medium text-textSecondary">
-              Course *
+              Courses *
             </label>
-            <select
-              required
-              value={formData.courseId}
-              onChange={(event) => handleChange('courseId', event.target.value)}
-            className="w-full rounded-lg border border-card bg-card px-4 py-3 text-text focus:outline-none focus:ring-2 focus:ring-primary disabled:cursor-not-allowed disabled:opacity-50"
-            disabled={(!hasCourses && !isEditMode) || (!!preselectedCourseId && !isEditMode)}
-            >
-              <option value="" disabled>
-                Select course
-              </option>
-              {courses.map((course) => (
-                <option key={course.id} value={course.id}>
-                  {course.title}
-                </option>
-              ))}
-            {!hasCourses && subject?.courseId && (
-              <option value={subject.courseId}>{'Current course (archived)'}</option>
-            )}
-            </select>
+            <div className="space-y-2 rounded-lg border border-card bg-card p-4">
+              <label className="flex items-center gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={formData.applicableCourses?.includes('AIML') || false}
+                  onChange={(e) => handleCourseCheckboxChange('AIML', e.target.checked)}
+                  className="h-4 w-4 rounded border-card text-primary focus:ring-2 focus:ring-primary"
+                />
+                <span className="text-text">AIML</span>
+              </label>
+              <label className="flex items-center gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={formData.applicableCourses?.includes('AI_ENGINEERING') || false}
+                  onChange={(e) => handleCourseCheckboxChange('AI_ENGINEERING', e.target.checked)}
+                  className="h-4 w-4 rounded border-card text-primary focus:ring-2 focus:ring-primary"
+                />
+                <span className="text-text">AI Engineering</span>
+              </label>
+              {formData.applicableCourses && formData.applicableCourses.length === 0 && (
+                <p className="text-xs text-red-400 mt-2">Please select at least one course</p>
+              )}
+            </div>
           </div>
 
           <div>

@@ -65,10 +65,10 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) =>
   }
 
   return (
-    <div className="flex min-h-screen">
+    <div className="flex min-h-screen bg-background">
       <Sidebar />
       <MobileNav />
-      <main className="flex-1 overflow-x-hidden md:ml-0 relative z-10">
+      <main className="flex-1 overflow-x-hidden md:ml-0 relative z-10 bg-background">
         <div className="sticky top-0 z-20 bg-card/80 backdrop-blur-sm border-b border-card md:mt-0 mt-16">
           <div className="flex items-center justify-between px-4 md:px-6 py-3">
             <div>

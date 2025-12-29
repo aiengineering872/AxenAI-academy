@@ -39,10 +39,9 @@ plt.title('Simple Plot Example')
 plt.legend()
 plt.grid(True)
 
-# Note: plt.show() doesn't work in browser, but we can display the plot data
-print("Plot data generated!")
-print("X values (first 5):", x[:5])
-print("Y values (first 5):", y[:5])
+# Display the plot (will be shown in output)
+display(plt.gcf())
+
 print("Hello from AI Code Editor!")`);
   const [output, setOutput] = useState('');
   const [loading, setLoading] = useState(false);
@@ -170,6 +169,9 @@ plt.ylabel('Y')
 plt.title('Simple Plot Example')
 plt.legend()
 plt.grid(True)
+
+# Display the plot (will be shown in output)
+display(plt.gcf())
 
 print("Hello from AI Code Editor!")`
         };
@@ -651,7 +653,7 @@ model.fit(X_train, y_train)
 y_pred = model.predict(X_test)
 accuracy = accuracy_score(y_test, y_pred)
 
-print(f"\nModel Accuracy: {accuracy:.4f}")
+print(f"Model Accuracy: {accuracy:.4f}")
 print("Model training completed!")`,
       data: `# Data Analysis Example
 import pandas as pd
@@ -919,7 +921,8 @@ print(json.dumps(result, indent=2))
           <motion.div
             initial={{ opacity: 0, x: 20 }}
             animate={{ opacity: 1, x: 0 }}
-            className="bg-black modern-card glow-border rounded-xl overflow-hidden relative"
+            className="bg-black modern-card glow-border rounded-xl overflow-hidden relative no-hover-transform"
+            style={{ pointerEvents: 'auto' }}
           >
             <div className="bg-card/50 p-4 border-b border-card flex items-center justify-between relative z-10">
               <span className="text-sm font-medium text-text">Console Output</span>
@@ -938,7 +941,17 @@ print(json.dumps(result, indent=2))
                 </button>
               )}
             </div>
-            <div className="p-4 h-[500px] overflow-auto space-y-4" style={{ backgroundColor: 'rgba(10, 17, 40, 0.9)' }}>
+            <div 
+              className="p-4 h-[500px] overflow-y-auto overflow-x-hidden space-y-4" 
+              style={{ 
+                backgroundColor: 'rgba(10, 17, 40, 0.9)',
+                position: 'relative',
+                zIndex: 10,
+                pointerEvents: 'auto',
+                WebkitOverflowScrolling: 'touch',
+                overscrollBehavior: 'contain'
+              }}
+            >
               {error ? (
                 <>
                   <pre className="text-red-400 font-mono text-sm whitespace-pre-wrap break-words">

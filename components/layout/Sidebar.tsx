@@ -53,8 +53,8 @@ export const Sidebar: React.FC = () => {
   };
 
   const getThemeStyles = () => {
-    // Always use dark midnight theme
-    return 'bg-card border-r border-primary/20 relative z-10';
+    // Always use dark midnight theme - matches theme background color (#0a1128)
+    return 'bg-background border-r border-primary/20 relative z-10';
   };
 
   return (

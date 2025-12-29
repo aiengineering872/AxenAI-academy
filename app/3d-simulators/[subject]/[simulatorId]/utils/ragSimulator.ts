@@ -180,7 +180,7 @@ USER: ${query}`;
 }
 
 /**
- * Generate mock LLM response based on retrieved chunks
+ * Generate improved mock LLM response based on retrieved chunks
  */
 export function generateMockLLMResponse(
   query: string,
@@ -192,56 +192,143 @@ export function generateMockLLMResponse(
     return 'I cannot answer this question based on the provided context.';
   }
 
-  // Combine chunk texts
-  const context = chunks.map((c) => c.text).join(' ');
-
   // Determine response style based on parameters
   const isCreative = creativity > 0.7;
   const isVerbose = verbosity > 0.7;
   const isConcise = verbosity < 0.3;
 
-  // Simple keyword matching to generate relevant response
-  const queryLower = query.toLowerCase();
-  const contextLower = context.toLowerCase();
+  // Extract query intent and important words
+  const queryLower = query.toLowerCase().trim();
+  const queryWords = queryLower
+    .split(/\s+/)
+    .filter(w => w.length > 2)
+    .filter(w => !['the', 'is', 'are', 'was', 'were', 'what', 'who', 'when', 'where', 'why', 'how', 'which'].includes(w));
+  
+  // Check if query is a question
+  const isQuestion = /^(what|who|when|where|why|how|which|is|are|does|do|can|could|will|would|explain|describe|tell|define|list)/i.test(query);
 
-  // Extract relevant sentences from context
-  const sentences = context.split(/[.!?]+/).filter((s) => s.trim().length > 10);
-  const relevantSentences = sentences
-    .filter((sentence) => {
+  // Find the most relevant content from each chunk
+  const relevantContent: Array<{ text: string; score: number; chunkIndex: number }> = [];
+  
+  chunks.forEach((chunk, chunkIndex) => {
+    const chunkText = chunk.text;
+    const chunkLower = chunkText.toLowerCase();
+    
+    // Calculate relevance score for this chunk
+    let chunkScore = 0;
+    for (const word of queryWords) {
+      const wordRegex = new RegExp(`\\b${word}\\b`, 'gi');
+      const matches = chunkLower.match(wordRegex);
+      if (matches) {
+        chunkScore += matches.length * 2; // Weighted by frequency
+      }
+    }
+    
+    // Extract sentences from chunk
+    const sentences = chunkText
+      .split(/[.!?]+/)
+      .map(s => s.trim())
+      .filter(s => s.length > 15 && s.length < 400);
+    
+    // Score each sentence by relevance
+    sentences.forEach(sentence => {
       const sentenceLower = sentence.toLowerCase();
-      const queryWords = queryLower.split(/\s+/).filter((w) => w.length > 3);
-      return queryWords.some((word) => sentenceLower.includes(word));
-    })
-    .slice(0, isVerbose ? 5 : isConcise ? 1 : 3);
-
-  if (relevantSentences.length === 0) {
-    // Fallback response
-    const intro = isCreative
-      ? 'Based on the provided context, I can share the following insights:'
-      : 'According to the context:';
-    const mainContent = chunks[0].text.substring(0, 200);
-    return `${intro}\n\n${mainContent}${isVerbose ? '\n\nThis information is relevant to your question.' : ''}`;
+      let sentenceScore = chunkScore; // Start with chunk score
+      
+      // Boost score for query word matches in sentence
+      for (const word of queryWords) {
+        if (sentenceLower.includes(word)) {
+          sentenceScore += 3;
+        }
+      }
+      
+      // Bonus for question words at sentence start
+      if (isQuestion && /^(what|who|when|where|why|how|which|is|are|does|do|can|could|will|would)/i.test(sentence)) {
+        sentenceScore += 2;
+      }
+      
+      // Bonus for definitions/explanations
+      if (/(is|are|means|refers to|defined as|consists of)/i.test(sentence)) {
+        sentenceScore += 1;
+      }
+      
+      if (sentenceScore > 0) {
+        relevantContent.push({ text: sentence, score: sentenceScore, chunkIndex });
+      }
+    });
+  });
+  
+  // Sort by relevance score and remove duplicates
+  relevantContent.sort((a, b) => b.score - a.score);
+  
+  // Remove similar sentences (avoid repetition)
+  const uniqueContent: string[] = [];
+  const seenTexts = new Set<string>();
+  
+  for (const item of relevantContent) {
+    const normalized = item.text.toLowerCase().substring(0, 50);
+    if (!seenTexts.has(normalized)) {
+      seenTexts.add(normalized);
+      uniqueContent.push(item.text);
+      
+      // Limit based on verbosity
+      const maxSentences = isVerbose ? 5 : isConcise ? 1 : 3;
+      if (uniqueContent.length >= maxSentences) break;
+    }
   }
-
+  
+  // If no relevant content found, use first chunk
+  if (uniqueContent.length === 0) {
+    const firstChunk = chunks[0].text;
+    const sentences = firstChunk.split(/[.!?]+/).map(s => s.trim()).filter(s => s.length > 10);
+    uniqueContent.push(...sentences.slice(0, isVerbose ? 3 : isConcise ? 1 : 2));
+  }
+  
   // Build response
   let response = '';
-
-  if (isCreative) {
-    response += 'Based on the information provided, ';
+  
+  if (isQuestion) {
+    // For questions, provide direct answer
+    if (isCreative) {
+      response = 'Based on the provided context, ';
+    }
+    
+    // Combine sentences intelligently
+    response += uniqueContent
+      .join(isVerbose ? ' Furthermore, ' : '. ')
+      .replace(/\s+/g, ' ')
+      .trim();
+      
+    // Ensure proper sentence ending
+    if (!response.match(/[.!?]$/)) {
+      response += '.';
+    }
   } else {
-    response += 'According to the context, ';
+    // For statements/commands
+    const intro = isCreative
+      ? 'Based on the information provided: '
+      : 'According to the context: ';
+    
+    response = intro + uniqueContent
+      .join(isVerbose ? ' Additionally, ' : '. ')
+      .replace(/\s+/g, ' ')
+      .trim();
+      
+    if (!response.match(/[.!?]$/)) {
+      response += '.';
+    }
   }
-
-  response += relevantSentences.join(isVerbose ? ' Additionally, ' : '. ');
-
+  
+  // Add verbosity details
   if (isVerbose && chunks.length > 1) {
-    response += `\n\nThis information is drawn from ${chunks.length} relevant sections of the document.`;
+    response += `\n\nThis answer is based on ${chunks.length} relevant section${chunks.length > 1 ? 's' : ''} from the document.`;
   }
-
-  if (isConcise) {
-    response = response.substring(0, 150) + '...';
+  
+  // Apply conciseness
+  if (isConcise && response.length > 150) {
+    response = response.substring(0, 147) + '...';
   }
-
+  
   return response.trim();
 }
 

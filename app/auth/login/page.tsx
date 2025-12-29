@@ -7,6 +7,57 @@ import { Mail, Lock, LogIn } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import Link from 'next/link';
 
+// Helper function to convert Firebase errors to user-friendly messages
+const getErrorMessage = (error: any): string => {
+  if (!error) return 'An error occurred';
+  
+  // Check for Firebase error code
+  const errorCode = error.code || '';
+  const errorMessage = error.message || '';
+  
+  // Firebase authentication error codes
+  switch (errorCode) {
+    case 'auth/invalid-credential':
+    case 'auth/wrong-password':
+    case 'auth/invalid-password':
+      return 'Wrong password. Please try again.';
+    
+    case 'auth/user-not-found':
+      return 'No account found with this email address.';
+    
+    case 'auth/invalid-email':
+      return 'Invalid email address. Please check your email.';
+    
+    case 'auth/user-disabled':
+      return 'This account has been disabled. Please contact support.';
+    
+    case 'auth/too-many-requests':
+      return 'Too many failed attempts. Please try again later.';
+    
+    case 'auth/network-request-failed':
+      return 'Network error. Please check your internet connection.';
+    
+    case 'auth/operation-not-allowed':
+      return 'This sign-in method is not enabled.';
+    
+    default:
+      // If it's a Firebase error message, try to extract a cleaner message
+      if (errorMessage.includes('invalid-credential') || 
+          errorMessage.includes('wrong-password') ||
+          errorMessage.includes('invalid-password')) {
+        return 'Wrong password. Please try again.';
+      }
+      if (errorMessage.includes('user-not-found')) {
+        return 'No account found with this email address.';
+      }
+      if (errorMessage.includes('invalid-email')) {
+        return 'Invalid email address. Please check your email.';
+      }
+      // Return a generic message if we can't parse it
+      return errorMessage || 'Failed to sign in. Please try again.';
+  }
+};
+
 export default function LoginPage() {
   const router = useRouter();
   const { refreshUser } = useAuth();
@@ -14,6 +65,8 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
+  const [resetLoading, setResetLoading] = useState(false);
 
   const handleGoogleSignIn = async () => {
     try {
@@ -25,7 +78,7 @@ export default function LoginPage() {
       await refreshUser();
       router.push('/dashboard');
     } catch (err: any) {
-      setError(err.message || 'Failed to sign in with Google');
+      setError(getErrorMessage(err));
     } finally {
       setLoading(false);
     }
@@ -36,15 +89,46 @@ export default function LoginPage() {
     try {
       setLoading(true);
       setError('');
+      setSuccess('');
 
       const { signInWithEmail } = await import('@/lib/firebase/auth');
       await signInWithEmail(email, password);
       await refreshUser();
       router.push('/dashboard');
     } catch (err: any) {
-      setError(err.message || 'Failed to sign in');
+      setError(getErrorMessage(err));
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleForgotPassword = async () => {
+    if (!email) {
+      setError('Please enter your email address first');
+      return;
+    }
+
+    try {
+      setResetLoading(true);
+      setError('');
+      setSuccess('');
+
+      const { resetPassword } = await import('@/lib/firebase/auth');
+      await resetPassword(email);
+      setSuccess('Password reset email sent! Please check your inbox.');
+    } catch (err: any) {
+      const errorCode = err?.code || '';
+      const errorMessage = err?.message || '';
+      
+      if (errorCode === 'auth/user-not-found' || errorMessage.includes('user-not-found')) {
+        setError('No account found with this email address.');
+      } else if (errorCode === 'auth/invalid-email' || errorMessage.includes('invalid-email')) {
+        setError('Invalid email address. Please check your email.');
+      } else {
+        setError(errorMessage || 'Failed to send password reset email. Please try again.');
+      }
+    } finally {
+      setResetLoading(false);
     }
   };
 
@@ -80,6 +164,16 @@ export default function LoginPage() {
             </motion.div>
           )}
 
+          {success && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              className="mb-4 p-3 bg-green-500/20 border border-green-500/50 rounded-lg text-green-400 text-sm"
+            >
+              {success}
+            </motion.div>
+          )}
+
           <form onSubmit={handleEmailSignIn} className="space-y-4 mb-6">
             <div>
               <label className="block text-sm font-medium text-textSecondary mb-2">
@@ -100,9 +194,19 @@ export default function LoginPage() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-textSecondary mb-2">
-                Password
-              </label>
+              <div className="flex items-center justify-between mb-2">
+                <label className="block text-sm font-medium text-textSecondary">
+                  Password
+                </label>
+                <button
+                  type="button"
+                  onClick={handleForgotPassword}
+                  disabled={resetLoading || loading}
+                  className="text-sm text-primary hover:text-primary/80 hover:underline transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {resetLoading ? 'Sending...' : 'Forgot password?'}
+                </button>
+              </div>
               <div className="relative">
                 <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-textSecondary" />
                 <input

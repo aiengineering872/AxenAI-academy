@@ -41,9 +41,18 @@ const pythonSimulators = [
     icon: Code 
   },
   { 
-    id: 'python-memory', 
-    name: 'Python Memory & Variable Flow Simulator', 
-    description: 'Visualize how Python stores variables in memory, handles references, and manages mutability',
+    id: 'python-memory-manager', 
+    name: 'Python Memory Manager', 
+    description: 'Professional-grade memory visualization with step-by-step execution and interactive learning',
+    icon: Brain 
+  },
+];
+
+const machineLearningSimulators = [
+  { 
+    id: 'ml-simulator', 
+    name: 'ML Algorithms Simulator', 
+    description: 'Interactive visualization of Linear Regression, Logistic Regression, Decision Trees, KNN, and SVM',
     icon: Brain 
   },
 ];
@@ -67,61 +76,73 @@ const genAISimulators = [
 export default function SubjectSimulatorsPage() {
   const router = useRouter();
   const params = useParams();
-  const subjectId = params?.subject as string || 'python';
+  // Access params directly - useParams() in client components is synchronous
+  const subjectId = (params?.subject as string) || 'python';
   
   const currentSubject = subjects.find(s => s.id === subjectId) || subjects[0];
 
   return (
     <DashboardLayout>
-      <div className="flex gap-6 h-[calc(100vh-200px)]">
-        {/* Left Sidebar - Subject Navigation */}
-        <div className="w-64 flex flex-col gap-4">
-          <button
-            onClick={() => {
-              if (typeof window !== 'undefined') {
-                const returnUrl = sessionStorage.getItem('simulatorReturnUrl');
-                if (returnUrl) {
-                  router.push(returnUrl);
-                } else {
-                  router.back();
+      <div className="h-[calc(100vh-200px)]">
+        {/* Main Content Area - Full Width (No Sidebar) */}
+        <div className="bg-black rounded-lg border border-primary/20 p-6 overflow-y-auto h-full">
+          {/* Back to Topic Button */}
+          <div className="mb-6">
+            <button
+              onClick={() => {
+                if (typeof window !== 'undefined') {
+                  const returnUrl = sessionStorage.getItem('simulatorReturnUrl');
+                  if (returnUrl) {
+                    router.push(returnUrl);
+                  } else {
+                    router.back();
+                  }
                 }
-              }
-            }}
-            className="inline-flex items-center gap-2 text-textSecondary hover:text-primary transition-colors bg-black rounded-lg border border-primary/20 p-3"
-          >
-            <ArrowLeft className="w-4 h-4" />
-            <span>Back to Topic</span>
-          </button>
-          <aside className="flex-1 bg-black rounded-lg border border-primary/20 p-4 overflow-y-auto">
-            <h3 className="text-lg font-semibold text-text mb-4 px-2">Subjects</h3>
-          <nav className="space-y-2">
-            {subjects.map((subject) => {
-              const Icon = subject.icon;
-              const isActive = subjectId === subject.id;
-              
-              return (
-                <div
-                  key={subject.id}
-                  onClick={() => router.push(`/3d-simulators/${subject.id}`)}
-                  className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all cursor-pointer ${
-                    isActive
-                      ? 'bg-primary/20 text-primary shadow-glow'
-                      : 'text-textSecondary hover:text-text hover:bg-card/50'
-                  }`}
-                >
-                  <Icon className="w-5 h-5" />
-                  <span className="font-medium">{subject.name}</span>
-                </div>
-              );
-            })}
-          </nav>
-        </aside>
-        </div>
-
-        {/* Main Content Area */}
-        <div className="flex-1 bg-black rounded-lg border border-primary/20 p-6 overflow-y-auto">
+              }}
+              className="inline-flex items-center gap-2 text-textSecondary hover:text-primary transition-colors bg-card/50 rounded-lg border border-primary/20 px-4 py-2"
+            >
+              <ArrowLeft className="w-4 h-4" />
+              <span>Back to Topic</span>
+            </button>
+          </div>
           {subjectId === 'machine-learning' ? (
-            <MLSimulator />
+            <>
+              <div className="flex items-center gap-3 mb-6">
+                {(() => {
+                  const Icon = currentSubject.icon;
+                  return <Icon className="w-8 h-8 text-primary" />;
+                })()}
+                <h1 className="text-2xl font-bold text-text">{currentSubject.name} Simulators</h1>
+              </div>
+
+              <div className="space-y-4">
+                <p className="text-textSecondary mb-6">
+                  Explore interactive machine learning simulators. Click on any simulator below to get started.
+                </p>
+
+                {/* Machine Learning Simulator Cards */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {machineLearningSimulators.map((simulator) => (
+                    <div
+                      key={simulator.id}
+                      className="bg-card/50 backdrop-blur rounded-xl p-6 border border-primary/20 cursor-pointer hover:border-primary/40 hover:shadow-glow transition-all"
+                      onClick={() => router.push(`/3d-simulators/${subjectId}/${simulator.id}`)}
+                    >
+                      <div className="flex items-center gap-3 mb-3">
+                        <div className="w-12 h-12 rounded-lg bg-primary/20 flex items-center justify-center flex-shrink-0">
+                          {(() => {
+                            const SimIcon = simulator.icon;
+                            return <SimIcon className="w-6 h-6 text-primary" />;
+                          })()}
+                        </div>
+                        <h3 className="font-semibold text-text text-lg">{simulator.name}</h3>
+                      </div>
+                      <p className="text-sm text-textSecondary">{simulator.description}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </>
           ) : subjectId === 'deep-learning' ? (
             <>
               <div className="flex items-center gap-3 mb-6">

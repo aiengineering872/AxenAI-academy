@@ -1,10 +1,11 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Suspense } from 'react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { motion } from 'framer-motion';
 import { BookOpen, Clock, Play, CheckCircle } from 'lucide-react';
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import { learningProgressService } from '@/lib/services/learningProgressService';
 import { adminService } from '@/lib/services/adminService';
 
@@ -42,10 +43,19 @@ const getDifficultyColor = (difficulty: string) => {
   }
 };
 
-export default function LearningHubPage() {
+function LearningHubContent() {
+  const searchParams = useSearchParams();
   const [selectedCourse, setSelectedCourse] = useState<string | null>(null);
   const [courses, setCourses] = useState<Course[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // Check for course query parameter on mount
+  useEffect(() => {
+    const courseParam = searchParams?.get('course');
+    if (courseParam) {
+      setSelectedCourse(courseParam);
+    }
+  }, [searchParams]);
 
   // Fetch courses from Firebase
   useEffect(() => {
@@ -60,9 +70,30 @@ export default function LearningHubPage() {
         const allModules = await adminService.getModules();
 
         // Merge modules into courses
+        // Map course IDs to applicableCourses identifiers
+        const getCourseIdentifier = (course: any): string => {
+          const title = course.title?.toLowerCase() || '';
+          if (title.includes('aiml') || title.includes('ai/ml') || title.includes('ai & ml')) {
+            return 'AIML';
+          }
+          if (title.includes('ai engineering')) {
+            return 'AI_ENGINEERING';
+          }
+          return course.id; // Fallback to course ID
+        };
+        
         const finalCourses = firebaseCourses.map((course: any) => {
+          const courseIdentifier = getCourseIdentifier(course);
           const courseModules = allModules
-            .filter((m: any) => m.courseId === course.id)
+            .filter((m: any) => {
+              // Check new applicableCourses array OR backward compatibility with courseId
+              if (Array.isArray(m.applicableCourses) && m.applicableCourses.includes(courseIdentifier)) {
+                return true;
+              }
+              // Backward compatibility: check old courseId field
+              if (m.courseId === course.id) return true;
+              return false;
+            })
             .sort((a: any, b: any) => (a.order || 0) - (b.order || 0))
             .map((module: any) => {
               const prog = learningProgressService.getModuleProgress(course.id, module.id);
@@ -253,5 +284,21 @@ export default function LearningHubPage() {
         )}
       </div>
     </DashboardLayout>
+  );
+}
+
+export default function LearningHubPage() {
+  return (
+    <Suspense fallback={
+      <DashboardLayout>
+        <div className="space-y-6">
+          <div className="text-center py-12">
+            <p className="text-textSecondary">Loading...</p>
+          </div>
+        </div>
+      </DashboardLayout>
+    }>
+      <LearningHubContent />
+    </Suspense>
   );
 }

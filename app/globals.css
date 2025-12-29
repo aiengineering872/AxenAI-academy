@@ -322,6 +322,11 @@ textarea::placeholder {
   box-shadow: 0 20px 40px rgba(255, 107, 53, 0.5), 0 0 60px rgba(255, 69, 0, 0.4);
 }
 
+/* Prevent hover transform on console output containers */
+.modern-card.no-hover-transform:hover {
+  transform: none !important;
+}
+
 /* Modern button hover effects with orange */
 button.bg-primary,
 button.bg-primary:hover {

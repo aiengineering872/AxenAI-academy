@@ -109,7 +109,7 @@ export const adminService = {
       return {
         id: moduleSnap.id,
         ...data,
-        modules: Array.isArray(data?.modules) ? data.modules : [], // FIX added
+        modules: Array.isArray(data?.modules) ? data.modules : [],
       };
     } catch (error) {
       console.error('Error fetching module:', error);
@@ -122,15 +122,46 @@ export const adminService = {
       const isInitialized = await ensureFirebase();
       if (!isInitialized || !db) return [];
 
-      let qRef;
+      const qRef = query(collection(db, 'modules'));
+      const snapshot = await getDocs(qRef);
+      let modules = snapshot.docs.map((docSnap) => {
+        const data = docSnap.data();
+        return { id: docSnap.id, ...data };
+      });
+
+      // Filter by courseId if provided
+      // Map courseId to applicableCourses identifier for filtering
       if (courseId) {
-        qRef = query(collection(db, 'modules'), where('courseId', '==', courseId));
-      } else {
-        qRef = query(collection(db, 'modules'));
+        // Get course to determine identifier
+        let courseIdentifier = courseId; // Fallback to courseId
+        try {
+          const coursesSnapshot = await getDocs(collection(db, 'courses'));
+          const allCourses = coursesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as any[];
+          const course = allCourses.find((c: any) => c.id === courseId);
+          
+          if (course) {
+            const title = (course.title as string)?.toLowerCase() || '';
+            if (title.includes('aiml') || title.includes('ai/ml') || title.includes('ai & ml')) {
+              courseIdentifier = 'AIML';
+            } else if (title.includes('ai engineering')) {
+              courseIdentifier = 'AI_ENGINEERING';
+            }
+          }
+        } catch (error) {
+          console.error('Error fetching courses for filtering:', error);
+        }
+        
+        modules = modules.filter((m: any) => {
+          // New format: check applicableCourses array
+          if (Array.isArray(m.applicableCourses) && m.applicableCourses.includes(courseIdentifier)) {
+            return true;
+          }
+          // Backward compatibility: check old courseId field
+          if (m.courseId === courseId) return true;
+          return false;
+        });
       }
 
-      const snapshot = await getDocs(qRef);
-      const modules = snapshot.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() }));
       return modules.sort((a: any, b: any) => (a.order || 0) - (b.order || 0));
     } catch (error) {
       console.error('Error fetching modules:', error);
@@ -140,8 +171,13 @@ export const adminService = {
 
   async createModule(moduleData: Record<string, any>) {
     await ensureFirebase();
+    const dataToSave = { ...moduleData };
+    // Ensure applicableCourses is an array
+    if (!Array.isArray(dataToSave.applicableCourses)) {
+      dataToSave.applicableCourses = dataToSave.applicableCourses ? [dataToSave.applicableCourses] : [];
+    }
     const docRef = await addDoc(collection(db, 'modules'), {
-      ...moduleData,
+      ...dataToSave,
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
     });
@@ -150,10 +186,73 @@ export const adminService = {
 
   async updateModule(moduleId: string, updates: Record<string, any>) {
     await ensureFirebase();
-    await updateDoc(doc(db, 'modules', moduleId), {
-      ...updates,
-      updatedAt: serverTimestamp(),
-    });
+    // Use merge: true to ensure all existing fields are preserved
+    // CRITICAL: This prevents data loss when updating modules (including googleColabUrl, pptUrl, etc.)
+    // googleColabUrl must NEVER be removed or touched during any update
+    const moduleRef = doc(db, 'modules', moduleId);
+    const existingData = await getDoc(moduleRef);
+    
+    if (existingData.exists()) {
+      const existing = existingData.data();
+      
+      // Handle applicableCourses: ensure it's an array
+      if (updates.applicableCourses !== undefined) {
+        if (!Array.isArray(updates.applicableCourses)) {
+          updates.applicableCourses = updates.applicableCourses ? [updates.applicableCourses] : [];
+        }
+      }
+      
+      // Deep merge modules array to preserve all topic fields (pptUrl, googleColabUrl, etc.)
+      let mergedModules = existing.modules || [];
+      if (updates.modules && Array.isArray(updates.modules)) {
+        // Deep merge topics to ensure googleColabUrl is never lost
+        // If updates has modules, merge with existing to preserve googleColabUrl
+        mergedModules = updates.modules.map((updateModule: any, moduleIndex: number) => {
+          const existingModule = (existing.modules || []).find((em: any) => em.id === updateModule.id) || {};
+          return {
+            ...existingModule, // Start with existing module data
+            ...updateModule, // Apply updates
+            // CRITICAL: Deep merge topics to preserve googleColabUrl
+            topics: (updateModule.topics || []).map((updateTopic: any) => {
+              const existingTopic = (existingModule.topics || []).find((et: any) => et.id === updateTopic.id) || {};
+              return {
+                ...existingTopic, // Start with existing topic data (includes googleColabUrl)
+                ...updateTopic, // Apply updates
+                // CRITICAL: Always preserve googleColabUrl, pptUrl, pptTitle - never remove them
+                googleColabUrl: updateTopic.googleColabUrl || existingTopic.googleColabUrl || '',
+                pptUrl: updateTopic.pptUrl || existingTopic.pptUrl || '',
+                pptTitle: updateTopic.pptTitle || existingTopic.pptTitle || '',
+              };
+            }),
+          };
+        });
+      }
+      
+      // Deep merge to preserve nested structures (modules array with topics)
+      const mergedUpdates = {
+        ...existing,
+        ...updates,
+        // Preserve applicableCourses if not explicitly updated
+        applicableCourses: updates.applicableCourses !== undefined 
+          ? updates.applicableCourses 
+          : (existing.applicableCourses || []),
+        // Use the merged modules array (preserves all topic fields including googleColabUrl)
+        modules: mergedModules,
+        updatedAt: serverTimestamp(),
+      };
+      await setDoc(moduleRef, mergedUpdates, { merge: true });
+    } else {
+      // If document doesn't exist, create it
+      const dataToSave = { ...updates };
+      if (!Array.isArray(dataToSave.applicableCourses)) {
+        dataToSave.applicableCourses = dataToSave.applicableCourses ? [dataToSave.applicableCourses] : [];
+      }
+      await setDoc(moduleRef, {
+        ...dataToSave,
+        updatedAt: serverTimestamp(),
+        createdAt: serverTimestamp(),
+      });
+    }
   },
 
   async deleteModule(moduleId: string) {

@@ -55,6 +55,150 @@ interface ModuleContentProps {
   moduleId: string;
 }
 
+// Helper function to map module/course to simulator subject
+const getSimulatorSubject = (moduleId: string, moduleTitle: string, courseId: string, courseTitle: string): string => {
+  const moduleIdLower = moduleId?.toLowerCase() || '';
+  const moduleTitleLower = moduleTitle?.toLowerCase() || '';
+  const courseIdLower = courseId?.toLowerCase() || '';
+  const courseTitleLower = courseTitle?.toLowerCase() || '';
+  
+  // Check module first (more specific)
+  // IMPORTANT: Check in order of specificity to avoid false matches
+  // Most specific patterns first: GenAI > Deep Learning > Machine Learning > Python
+  
+  // Python
+  if (moduleIdLower.includes('python') || moduleTitleLower.includes('python')) {
+    return 'python';
+  }
+  
+  // GenAI / Generative AI (check FIRST - most specific, before other AI terms)
+  // Check for various GenAI patterns
+  if (moduleIdLower.includes('genai') || 
+      moduleIdLower.includes('gen-ai') ||
+      moduleIdLower.includes('gen ai') ||
+      moduleIdLower.includes('generative-ai') ||
+      moduleIdLower.includes('generativeai') ||
+      moduleIdLower.includes('generative ai') ||
+      moduleTitleLower.includes('genai') || 
+      moduleTitleLower.includes('gen-ai') ||
+      moduleTitleLower.includes('gen ai') ||
+      moduleTitleLower.includes('generative ai') ||
+      moduleTitleLower.includes('generative-ai') ||
+      moduleTitleLower.includes('generativeai')) {
+    return 'genai';
+  }
+  
+  // Deep Learning (check before Machine Learning)
+  if (moduleIdLower.includes('deep-learning') || 
+      moduleIdLower.includes('deeplearning') ||
+      moduleIdLower.includes('deep learning') ||
+      moduleTitleLower.includes('deep learning') ||
+      moduleTitleLower.includes('deeplearning') ||
+      moduleTitleLower.includes('deep-learning')) {
+    return 'deep-learning';
+  }
+  // Deep Learning abbreviation (only if not already matched)
+  if (moduleIdLower.includes('dl') && 
+      !moduleIdLower.includes('machine') && 
+      !moduleTitleLower.includes('machine') &&
+      !moduleIdLower.includes('generative') &&
+      !moduleTitleLower.includes('generative')) {
+    return 'deep-learning';
+  }
+  
+  // Machine Learning (check after GenAI and Deep Learning)
+  // Make sure it doesn't match GenAI or Deep Learning
+  if ((moduleIdLower.includes('machine-learning') || 
+      moduleIdLower.includes('machinelearning') ||
+      moduleIdLower.includes('machine learning') ||
+      moduleTitleLower.includes('machine learning') ||
+      moduleTitleLower.includes('machinelearning') ||
+      moduleTitleLower.includes('machine-learning')) &&
+      !moduleIdLower.includes('generative') &&
+      !moduleTitleLower.includes('generative') &&
+      !moduleIdLower.includes('deep') &&
+      !moduleTitleLower.includes('deep')) {
+    return 'machine-learning';
+  }
+  // Machine Learning abbreviation (only if not GenAI or Deep Learning)
+  if ((moduleIdLower.includes('ml') || moduleTitleLower.includes('ml')) && 
+      !moduleIdLower.includes('deep') && 
+      !moduleTitleLower.includes('deep') &&
+      !moduleIdLower.includes('generative') &&
+      !moduleTitleLower.includes('generative') &&
+      !moduleIdLower.includes('genai') &&
+      !moduleTitleLower.includes('genai')) {
+    return 'machine-learning';
+  }
+  
+  // Fallback to course (same priority order)
+  // Python
+  if (courseIdLower.includes('python') || courseTitleLower.includes('python')) {
+    return 'python';
+  }
+  
+  // GenAI / Generative AI (check FIRST - most specific, before other AI terms)
+  if (courseIdLower.includes('genai') || 
+      courseIdLower.includes('gen-ai') ||
+      courseIdLower.includes('gen ai') ||
+      courseIdLower.includes('generative-ai') ||
+      courseIdLower.includes('generativeai') ||
+      courseIdLower.includes('generative ai') ||
+      courseTitleLower.includes('genai') || 
+      courseTitleLower.includes('gen-ai') ||
+      courseTitleLower.includes('gen ai') ||
+      courseTitleLower.includes('generative ai') ||
+      courseTitleLower.includes('generative-ai') ||
+      courseTitleLower.includes('generativeai')) {
+    return 'genai';
+  }
+  
+  // Deep Learning (check before Machine Learning)
+  if (courseIdLower.includes('deep-learning') || 
+      courseIdLower.includes('deeplearning') ||
+      courseIdLower.includes('deep learning') ||
+      courseTitleLower.includes('deep learning') ||
+      courseTitleLower.includes('deeplearning') ||
+      courseTitleLower.includes('deep-learning')) {
+    return 'deep-learning';
+  }
+  // Deep Learning abbreviation
+  if (courseIdLower.includes('dl') && 
+      !courseIdLower.includes('machine') && 
+      !courseTitleLower.includes('machine') &&
+      !courseIdLower.includes('generative') &&
+      !courseTitleLower.includes('generative')) {
+    return 'deep-learning';
+  }
+  
+  // Machine Learning (check after GenAI and Deep Learning)
+  if ((courseIdLower.includes('machine-learning') || 
+      courseIdLower.includes('machinelearning') ||
+      courseIdLower.includes('machine learning') ||
+      courseTitleLower.includes('machine learning') ||
+      courseTitleLower.includes('machinelearning') ||
+      courseTitleLower.includes('machine-learning')) &&
+      !courseIdLower.includes('generative') &&
+      !courseTitleLower.includes('generative') &&
+      !courseIdLower.includes('deep') &&
+      !courseTitleLower.includes('deep')) {
+    return 'machine-learning';
+  }
+  // Machine Learning abbreviation
+  if ((courseIdLower.includes('ml') || courseTitleLower.includes('ml')) && 
+      !courseIdLower.includes('deep') && 
+      !courseTitleLower.includes('deep') &&
+      !courseIdLower.includes('generative') &&
+      !courseTitleLower.includes('generative') &&
+      !courseIdLower.includes('genai') &&
+      !courseTitleLower.includes('genai')) {
+    return 'machine-learning';
+  }
+  
+  // Default to python
+  return 'python';
+};
+
 export default function ModuleContent({ courseId, moduleId }: ModuleContentProps) {
   const pathname = usePathname();
   const [currentLesson, setCurrentLesson] = useState(0);
@@ -621,7 +765,7 @@ export default function ModuleContent({ courseId, moduleId }: ModuleContentProps
         <div className="space-y-6">
           <div className="flex items-center justify-between">
             <Link
-              href="/learning"
+              href={`/learning/${courseId}`}
               className="text-primary hover:underline flex items-center gap-2"
             >
               <ArrowLeft className="w-4 h-4" />
@@ -652,7 +796,7 @@ export default function ModuleContent({ courseId, moduleId }: ModuleContentProps
         <div className="space-y-6">
           <div className="flex items-center justify-between">
             <Link
-              href="/learning"
+              href={`/learning/${courseId}`}
               className="text-primary hover:underline flex items-center gap-2"
             >
               <ArrowLeft className="w-4 h-4" />
@@ -688,7 +832,7 @@ export default function ModuleContent({ courseId, moduleId }: ModuleContentProps
       <div className="space-y-6" ref={contentRef}>
         <div className="flex items-center justify-between">
           <Link
-            href="/learning"
+            href={`/learning/${courseId}`}
             className="text-primary hover:underline flex items-center gap-2"
           >
             <ArrowLeft className="w-4 h-4" />
@@ -821,7 +965,7 @@ export default function ModuleContent({ courseId, moduleId }: ModuleContentProps
                   </p>
                 </div>
                 <Link
-                  href="/3d-simulators"
+                  href={`/3d-simulators/${getSimulatorSubject(moduleId, moduleTitle, courseId, courseTitle)}`}
                   onClick={() => {
                     if (typeof window !== 'undefined' && pathname) {
                       sessionStorage.setItem('simulatorReturnUrl', pathname);

@@ -37,7 +37,7 @@ import {
 import { Line, Scatter } from 'react-chartjs-2';
 import type { NeuralNetworkPlaygroundProps, DataPoint, ModelConfig, TrainingMetrics, DatasetType, ActivationFunction, OptimizerType } from './types';
 import { generateDataset, normalizeData } from './utils/datasetGenerator';
-import { parseFile } from './utils/fileParser';
+import { parseFile, type ParseFileResult, hasError } from './utils/fileParser';
 
 // Register Chart.js components
 ChartJS.register(
@@ -251,12 +251,12 @@ const NeuralNetworkPlayground: React.FC<NeuralNetworkPlaygroundProps> = ({ class
     setError(null);
     const result = await parseFile(file);
     
-    if (result.error) {
+    if (hasError(result)) {
       setError(result.error.message);
       return;
     }
 
-    if (result.data.length === 0) {
+    if (!result.data || result.data.length === 0) {
       setError('No valid data points found in file');
       return;
     }
@@ -321,7 +321,7 @@ const NeuralNetworkPlayground: React.FC<NeuralNetworkPlaygroundProps> = ({ class
         shuffle: config.shuffle,
         validationData: config.validationSplit > 0 ? [valXs, valYs] : undefined,
         callbacks: {
-          onEpochEnd: async (epoch, logs) => {
+          onEpochEnd: async (epoch: number, logs: any) => {
             if (trainingAbortRef.current?.signal.aborted) {
               return;
             }

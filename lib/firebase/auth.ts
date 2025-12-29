@@ -24,6 +24,7 @@ let GoogleAuthProvider: any;
 let signOut: any;
 let signInWithEmailAndPassword: any;
 let createUserWithEmailAndPassword: any;
+let sendPasswordResetEmail: any;
 let onAuthStateChanged: any;
 
 const loadFirebaseAuth = async () => {
@@ -36,6 +37,7 @@ const loadFirebaseAuth = async () => {
     signOut = firebaseAuth.signOut;
     signInWithEmailAndPassword = firebaseAuth.signInWithEmailAndPassword;
     createUserWithEmailAndPassword = firebaseAuth.createUserWithEmailAndPassword;
+    sendPasswordResetEmail = firebaseAuth.sendPasswordResetEmail;
     onAuthStateChanged = firebaseAuth.onAuthStateChanged;
     firebaseAuthLoaded = true;
   } catch (error) {
@@ -247,4 +249,28 @@ export const getUserProfile = async (uid: string): Promise<UserProfile | null> =
   }
   
   return null;
+};
+
+export const resetPassword = async (email: string): Promise<void> => {
+  if (!isFirebaseConfigured()) {
+    throw new Error('Firebase is not configured. Please set up your Firebase credentials.');
+  }
+  
+  await loadFirebaseAuth();
+  if (!sendPasswordResetEmail) {
+    throw new Error('Firebase auth not available');
+  }
+  
+  const firebaseConfigModule = await import('./config');
+  try {
+    await firebaseConfigModule.initializeFirebase();
+  } catch (error) {
+    throw new Error('Firebase initialization failed. Please verify configuration.');
+  }
+  
+  if (!firebaseConfigModule.auth) {
+    throw new Error('Firebase auth not initialized');
+  }
+  
+  await sendPasswordResetEmail(firebaseConfigModule.auth, email);
 };

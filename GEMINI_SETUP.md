@@ -1,10 +1,12 @@
 # Gemini API Setup Guide
 
 ## Current Status
-Your Gemini API key is in `.env.local`:
+Your Gemini API key should be in `.env.local`:
 ```
-NEXT_PUBLIC_GEMINI_API_KEY=AIzaSyBpxmD7JpMyBkzzuV9P9XIXxZvAIILWYbs
+NEXT_PUBLIC_GEMINI_API_KEY=your_api_key_here
 ```
+
+**⚠️ SECURITY NOTE:** Never commit your actual API key to version control. Always use `.env.local` (which is gitignored) for real API keys.
 
 ## Common Issues & Solutions
 
