@@ -2,14 +2,15 @@
 
 import React, { useCallback, useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
-import { BrainCircuit, Rocket, Sparkles, Menu, X, GraduationCap, Bot, Workflow } from 'lucide-react';
+import { BrainCircuit, Rocket, Sparkles, Menu, X, GraduationCap, Bot, Workflow, Mail, Phone, MapPin, Linkedin, Facebook, Instagram, Youtube, ArrowRight } from 'lucide-react';
+import { adminService } from '@/lib/services/adminService';
 
 const navLinks = [
-  { label: 'About', target: 'about' },
-  { label: 'Courses', target: 'courses' },
+  { label: 'Home', target: 'hero' },
+  { label: 'Course', target: 'courses' },
   { label: 'Curriculum', target: 'curriculum' },
+  { label: 'About', target: 'about' },
   { label: 'AI Tutor', target: 'ai-tutor' },
-  { label: 'Learning Path', target: 'learning-path' },
 ];
 
 const fadeInUp = {
@@ -258,45 +259,30 @@ const HeroSection: React.FC<{ onEnroll: () => void }> = ({ onEnroll }) => (
         transition={{ duration: 0.3, delay: 0.02, ease: 'easeOut' }}
       >
         <div className="relative overflow-hidden rounded-3xl border border-white/5 bg-gradient-to-br from-white/5 via-white/2 to-transparent p-6 shadow-2xl shadow-[0_0_45px_rgba(255,107,53,0.18)] before:absolute before:-inset-[2px] before:-z-10 before:bg-gradient-to-r before:from-[#ff6b35]/20 before:via-[#ff4500]/15 before:to-[#ff8c42]/20 before:blur-3xl before:content-['']">
-          <div className="grid gap-6">
-            <motion.div
-              className="rounded-2xl border border-white/10 bg-[#0F172A]/60 p-6 backdrop-blur-xl"
-              variants={fadeInUp}
-              custom={0.5}
-            >
-              <div className="flex items-center justify-between text-xs uppercase tracking-[0.3em] text-white/50">
-                <span>Learning Progress</span>
-                <span>AI Tutor</span>
-              </div>
-              <div className="mt-4 flex items-end gap-3">
-                <div className="flex-1">
-                  <div className="text-sm text-white/60">Projects completed</div>
-                  <div className="mt-2 text-3xl font-bold text-white">25+</div>
+          <motion.div
+            className="relative w-full overflow-hidden rounded-2xl border border-white/10 bg-[#020617]/90 shadow-[0_20px_45px_rgba(15,23,42,0.9)]"
+            variants={fadeInUp}
+            custom={0.5}
+          >
+            <div className="relative h-64 w-full bg-gradient-to-br from-[#020617] via-[#020617] to-[#0b1220]">
+              <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_rgba(255,107,53,0.24),_transparent_55%)]" />
+              <div className="relative flex h-full w-full flex-col items-center justify-center gap-4 px-6 text-center">
+                <div className="inline-flex items-center gap-2 rounded-full bg-white/5 px-4 py-1 text-[10px] font-semibold uppercase tracking-[0.35em] text-white/60">
+                  <span className="h-1.5 w-1.5 rounded-full bg-[#ff6b35]" />
+                  <span>App Intro</span>
                 </div>
-                <div className="h-16 w-[2px] bg-gradient-to-b from-transparent via-white/30 to-transparent" />
-                <div className="flex-1">
-                  <div className="text-sm text-white/60">Hours mentored</div>
-                  <div className="mt-2 text-3xl font-bold text-white">120+</div>
-                </div>
+                <p className="max-w-sm text-sm text-white/75">
+                  Watch a quick introduction to see how Axen AI helps you become an industry-ready AI Engineer.
+                </p>
+                <button
+                  type="button"
+                  className="group inline-flex h-16 w-16 items-center justify-center rounded-full bg-white/5 text-white shadow-[0_0_30px_rgba(255,107,53,0.55)] ring-2 ring-white/25 transition-all duration-300 hover:scale-105 hover:bg-[#ff6b35] hover:text-[#05050a] hover:ring-[#ffcc99]"
+                >
+                  <span className="ml-1 inline-block border-l-[14px] border-l-current border-y-[9px] border-y-transparent transition-transform duration-300 group-hover:translate-x-[1px]" />
+                </button>
               </div>
-            </motion.div>
-
-            <motion.div
-              className="flex items-center gap-4 rounded-2xl border border-white/10 bg-[#0F172A]/60 p-5 backdrop-blur-xl"
-              variants={fadeInUp}
-              custom={0.6}
-            >
-              <div className="rounded-2xl bg-gradient-to-br from-[#ff8c42] to-[#ff4500] p-3 text-[#05050a] shadow-lg shadow-[0_12px_30px_rgba(255,107,53,0.25)]">
-                <Bot className="h-6 w-6" />
-              </div>
-              <div>
-                <div className="text-sm uppercase tracking-[0.35em] text-white/50">
-                  Personalized
-                </div>
-                <div className="text-lg font-semibold text-white">Adaptive AI Mentor</div>
-              </div>
-            </motion.div>
-          </div>
+            </div>
+          </motion.div>
         </div>
       </motion.div>
     </div>
@@ -437,14 +423,14 @@ const CoursesSection: React.FC = () => (
           {
             title: 'AI Engineering',
             description:
-              'Build end-to-end AI systems with production-grade workflows, MLOps, and real-world case studies.',
-            highlights: ['Model Deployment', 'MLOps', 'Responsible AI'],
+              'Build production-ready AI systems using LLMs, modern frameworks, and real-world deployment workflows.',
+            highlights: ['LLMs', 'LangChain', 'Agentic AI', 'Model Development', 'AI Frameworks', 'Vibe Coding', 'Deployment'],
           },
           {
-            title: 'AI & ML',
+            title: 'AIML Engineering',
             description:
-              'Master the machine learning lifecycle, from core algorithms to advanced optimization techniques.',
-            highlights: ['Machine learning', 'Deep learning', 'MLOps'],
+              'Master AI from Python fundamentals to Machine Learning, Deep Learning, and Generative AI with hands-on projects.',
+            highlights: ['Python', 'Machine Learning', 'Deep Learning', 'Generative AI', 'Data Handling', 'Model Training', 'AI Projects'],
           },
         ].map((course, index) => (
           <motion.div
@@ -535,19 +521,19 @@ const CurriculumSection: React.FC = () => (
       >
         {[
           {
-            title: 'Phase 1: Foundations',
-            duration: 'Weeks 1-4',
-            items: ['Python for AI', 'Linear Algebra', 'Data Pipelines', 'Modeling Basics'],
+            title: 'Phase 1 — Foundations',
+            duration: 'Phase 1',
+            items: ['Python for AI', 'Mathematics for ML', 'Data Processing & Visualization', 'Machine Learning Basics'],
           },
           {
-            title: 'Phase 2: Deep Learning',
-            duration: 'Weeks 5-8',
-            items: ['CNNs & Vision', 'Transformers', 'NLP Systems', 'Prompt Engineering'],
+            title: 'Phase 2 — Advanced AI & Deep Learning',
+            duration: 'Phase 2',
+            items: ['Neural Networks & CNNs', 'Transformers & NLP', 'Generative AI & Prompt Engineering', 'LangChain & AI Frameworks', 'Agentic AI Systems'],
           },
           {
-            title: 'Phase 3: Production',
-            duration: 'Weeks 9-12',
-            items: ['MLOps', 'Monitoring', 'Optimization', 'Capstone Launch'],
+            title: 'Phase 3 — Production & Real-World AI',
+            duration: 'Phase 3',
+            items: ['Model Deployment & APIs', 'MLOps & Monitoring', 'Optimization & Scaling', 'Real-World Capstone Project'],
           },
         ].map((phase, index) => (
           <motion.div
@@ -737,9 +723,9 @@ const LearningPathSection: React.FC<{ onEnroll: () => void }> = ({ onEnroll }) =
         viewport={{ once: true, amount: 0.3 }}
       >
         {[
-          { title: 'Launch Pad', meta: 'Weeks 1-2', detail: 'Fundamentals, roadmap, career reset' },
-          { title: 'Build Sprints', meta: 'Weeks 3-8', detail: 'Hands-on labs, peer programming' },
-          { title: 'Capstone', meta: 'Weeks 9-12', detail: 'Ship, present, and deploy on cloud' },
+          { title: 'Weeks 1–2 — Foundations', meta: 'Foundations', detail: 'Core programming, AI basics, and roadmap planning to start your AI journey with clarity.' },
+          { title: 'Weeks 3–8 — Build & Practice', meta: 'Build & Practice', detail: 'Hands-on labs, real mini-projects, model training, and framework implementation with mentor guidance.' },
+          { title: 'Weeks 9–12 — Capstone & Deployment', meta: 'Capstone & Deployment', detail: 'Develop real AI applications, deploy models, and build a portfolio ready for industry opportunities.' },
         ].map((step, index) => (
           <motion.div
             key={step.title}
@@ -760,35 +746,176 @@ const LearningPathSection: React.FC<{ onEnroll: () => void }> = ({ onEnroll }) =
   </section>
 );
 
-const Footer: React.FC = () => (
-  <footer className="relative bg-[#05050a] py-10 text-white/60">
-    <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-[#ff6b35]/40 to-transparent" />
-    <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-6 px-6 text-sm lg:flex-row lg:px-8">
-      <div className="flex items-center gap-3">
-        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-[#ff6b35] via-[#ff4500] to-[#ff8c42]">
-          <span className="text-sm font-semibold text-white">A</span>
+const Footer: React.FC = () => {
+  const [email, setEmail] = useState('');
+  const [subscribeStatus, setSubscribeStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
+
+  const handleSubscribe = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!email.trim()) return;
+    setSubscribeStatus('loading');
+    try {
+      await adminService.addLead(email.trim());
+      setEmail('');
+      setSubscribeStatus('success');
+      setTimeout(() => setSubscribeStatus('idle'), 3000);
+    } catch {
+      setSubscribeStatus('error');
+      setTimeout(() => setSubscribeStatus('idle'), 3000);
+    }
+  };
+
+  return (
+    <footer className="relative bg-[#05050a] py-10 text-white/60">
+      <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-[#ff6b35]/40 to-transparent" />
+      <div className="mx-auto max-w-6xl px-6 lg:px-8">
+        <div className="grid grid-cols-1 gap-8 md:grid-cols-2 lg:grid-cols-4">
+          {/* Left Column - Branding & Contact */}
+          <div className="space-y-4">
+            <div className="flex items-center gap-3">
+              <img
+                src="/axen-logo.png"
+                alt="Axen AI Academy logo"
+                className="h-10 w-auto"
+              />
+            </div>
+            <p className="text-sm text-white">AI Engineer & AIML Engineer Platform</p>
+            <p className="text-xs text-white/80">AI Engineer & AIML Engineer Platform Powered By Agentic AI Training & Consultancy</p>
+            <div className="space-y-2 pt-2">
+              <div className="flex items-center gap-2 text-sm">
+                <Mail className="h-4 w-4 text-[#ff6b35]" />
+                <a href="mailto:contact@axenai.in" className="hover:text-white transition-colors">
+                  contact@axenai.in
+                </a>
+              </div>
+              <div className="flex items-center gap-2 text-sm">
+                <Phone className="h-4 w-4 text-[#ff6b35]" />
+                <a href="tel:+917995410143" className="hover:text-white transition-colors">
+                  +91 7995410143
+                </a>
+              </div>
+              <div className="flex items-center gap-2 text-sm">
+                <MapPin className="h-4 w-4 text-[#ff6b35]" />
+                <span>Global Reach</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Second Column - Quick Links */}
+          <div className="space-y-4">
+            <h3 className="text-base font-semibold text-white border-b border-[#ff6b35] pb-2">
+              Quick Links
+            </h3>
+            <ul className="space-y-2 text-sm">
+              <li>
+                <a href="#hero" className="hover:text-white transition-colors">Home</a>
+              </li>
+              <li>
+                <a href="#courses" className="hover:text-white transition-colors">Course</a>
+              </li>
+              <li>
+                <a href="#curriculum" className="hover:text-white transition-colors">Curriculum</a>
+              </li>
+              <li>
+                <a href="#about" className="hover:text-white transition-colors">About</a>
+              </li>
+              <li>
+                <a href="#ai-tutor" className="hover:text-white transition-colors">AI Tutor</a>
+              </li>
+            </ul>
+          </div>
+
+          {/* Third Column - Our Services */}
+          <div className="space-y-4">
+            <h3 className="text-base font-semibold text-white border-b border-[#ff6b35] pb-2">
+              Our Services
+            </h3>
+            <ul className="space-y-2 text-sm">
+              <li>
+                <a href="#courses" className="hover:text-white transition-colors">AI Analytics Training</a>
+              </li>
+              <li>
+                <a href="#courses" className="hover:text-white transition-colors">Self-Paced Learning</a>
+              </li>
+              <li>
+                <a href="#courses" className="hover:text-white transition-colors">AI Consultancy</a>
+              </li>
+              <li>
+                <a href="#courses" className="hover:text-white transition-colors">Agentic AI Solutions</a>
+              </li>
+            </ul>
+          </div>
+
+          {/* Right Column - Stay Connected */}
+          <div className="space-y-4">
+            <h3 className="text-base font-semibold text-white">Stay Connected</h3>
+            <form onSubmit={handleSubscribe} className="space-y-3">
+              <input
+                type="email"
+                placeholder="Enter your email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="w-full rounded bg-[#0a0a0f] px-4 py-2 text-sm text-white placeholder:text-white/40 focus:outline-none focus:ring-2 focus:ring-[#ff6b35]"
+              />
+              <button
+                type="submit"
+                disabled={subscribeStatus === 'loading'}
+                className="flex w-full items-center justify-center gap-2 rounded bg-[#ff6b35] px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-[#ff8c42] disabled:opacity-70"
+              >
+                Subscribe
+                <ArrowRight className="h-4 w-4" />
+              </button>
+              {subscribeStatus === 'success' && (
+                <p className="text-xs text-green-400">Thanks for subscribing!</p>
+              )}
+              {subscribeStatus === 'error' && (
+                <p className="text-xs text-red-400">Something went wrong. Please try again.</p>
+              )}
+            </form>
+            <div className="flex gap-2 pt-2">
+              <a
+                href="https://www.linkedin.com"
+                target="_blank"
+                rel="noreferrer"
+                className="flex h-10 w-10 items-center justify-center rounded bg-[#0a0a0f] text-white transition-colors hover:bg-[#ff6b35]"
+              >
+                <Linkedin className="h-5 w-5" />
+              </a>
+              <a
+                href="https://www.facebook.com"
+                target="_blank"
+                rel="noreferrer"
+                className="flex h-10 w-10 items-center justify-center rounded bg-[#0a0a0f] text-white transition-colors hover:bg-[#ff6b35]"
+              >
+                <Facebook className="h-5 w-5" />
+              </a>
+              <a
+                href="https://www.instagram.com/axen_ai/"
+                target="_blank"
+                rel="noreferrer"
+                className="flex h-10 w-10 items-center justify-center rounded bg-[#0a0a0f] text-white transition-colors hover:bg-[#ff6b35]"
+              >
+                <Instagram className="h-5 w-5" />
+              </a>
+              <a
+                href="https://www.youtube.com/@axen-ai01"  
+                target="_blank"
+                rel="noreferrer"
+                className="flex h-10 w-10 items-center justify-center rounded bg-[#0a0a0f] text-white transition-colors hover:bg-[#ff6b35]"
+              >
+                <Youtube className="h-5 w-5" />
+              </a>
+            </div>
+          </div>
         </div>
-        <span className="bg-gradient-to-r from-orange-400 via-amber-500 to-orange-600 bg-clip-text font-bold text-transparent">
-          Axen AI Academy
-        </span>
+        {/* Copyright */}
+        <div className="mt-8 border-t border-white/10 pt-6 text-center text-xs text-white/40">
+          © {new Date().getFullYear()} Axen AI Academy. All rights reserved.
+        </div>
       </div>
-      <div className="flex flex-wrap items-center gap-4 text-xs uppercase tracking-[0.3em] text-white/40">
-        <a href="https://twitter.com" className="hover:text-white transition-colors" target="_blank" rel="noreferrer">
-          Twitter
-        </a>
-        <a href="https://www.linkedin.com" className="hover:text-white transition-colors" target="_blank" rel="noreferrer">
-          LinkedIn
-        </a>
-        <a href="https://www.youtube.com" className="hover:text-white transition-colors" target="_blank" rel="noreferrer">
-          YouTube
-        </a>
-      </div>
-      <div className="text-xs text-white/40">
-        © {new Date().getFullYear()} Axen AI Academy. All rights reserved.
-      </div>
-    </div>
-  </footer>
-);
+    </footer>
+  );
+};
 
 export default function Home() {
   const [isScrolled, setIsScrolled] = useState(false);
@@ -830,11 +957,11 @@ export default function Home() {
       />
       <main className="pt-20">
         <HeroSection onEnroll={handleEnroll} />
-        <AboutSection />
         <CoursesSection />
         <CurriculumSection />
         <TutorSection />
         <LearningPathSection onEnroll={handleEnroll} />
+        <AboutSection />
       </main>
       <Footer />
     </div>
