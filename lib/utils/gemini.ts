@@ -168,7 +168,18 @@ export const generateGeminiResponse = async (
     if (!successfulResponse) {
       const errorMessage = lastError?.error?.message || lastError?.statusText || 'Unknown error';
       console.error('All Gemini API attempts failed. Last error:', lastError);
-      
+
+      // Suspended key: tell user to create a new key and update API Integration
+      if (
+        lastError?.status === 403 ||
+        (typeof errorMessage === 'string' && errorMessage.toLowerCase().includes('suspended'))
+      ) {
+        throw new Error(
+          'Your Gemini API key has been suspended by Google. ' +
+          'Create a new API key at https://aistudio.google.com/app/apikey, then add it in the API Integration tab (service name "Gemini" or "Google") and remove the old key.'
+        );
+      }
+
       // Provide helpful error message based on the issue
       if (lastError?.status === 404) {
         throw new Error(
@@ -184,7 +195,7 @@ export const generateGeminiResponse = async (
           `- Try creating a new API key if needed`
         );
       }
-      
+
       throw new Error(`Gemini API error: ${errorMessage}. Please verify your API key has access to Gemini models.`);
     }
 
@@ -210,15 +221,22 @@ export const generateGeminiResponse = async (
 
   } catch (error: any) {
     console.error('Gemini API error:', error);
-    
+
+    // Already a clear suspended message from above
+    if (error.message && error.message.includes('suspended by Google')) {
+      throw error;
+    }
+
     // Provide more helpful error messages
     // IMPORTANT: Users must add their own API keys in API Integration tab - NO .env.local needed
     if (error.message && error.message.includes('API key')) {
       throw new Error('Invalid or missing Gemini API key. Please add your Gemini API key in the API Integration tab (service name: "Gemini" or "Google"). Get your free key at https://aistudio.google.com/app/apikey');
     }
-    
-    if (error.message && error.message.includes('403')) {
-      throw new Error('Gemini API access denied. Please verify your API key has the correct permissions. Check your API key at https://aistudio.google.com/app/apikey');
+
+    if (error.message && (error.message.includes('403') || error.message.includes('suspended'))) {
+      throw new Error(
+        'Gemini API key suspended or access denied. Create a new key at https://aistudio.google.com/app/apikey and add it in the API Integration tab (service name "Gemini" or "Google").'
+      );
     }
     
     if (error.message && error.message.includes('404')) {

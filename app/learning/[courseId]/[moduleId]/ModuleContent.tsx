@@ -17,6 +17,12 @@ interface Topic {
   pptTitle?: string;
   pptUrl?: string;
   googleColabUrl?: string;
+  videoUrl?: string; // Backward compatibility
+  videoUrls?: {
+    english?: string;
+    hindi?: string;
+    telugu?: string;
+  };
 }
 
 interface Module {
@@ -25,13 +31,24 @@ interface Module {
   name: string;
   order: number;
   topics: Topic[];
+  videoUrl?: string; // Backward compatibility
+  videoUrls?: {
+    english?: string;
+    hindi?: string;
+    telugu?: string;
+  };
 }
 
 interface Lesson {
   id: string;
   title: string;
   content: string;
-  videoUrl?: string;
+  videoUrl?: string; // Backward compatibility
+  videoUrls?: {
+    english?: string;
+    hindi?: string;
+    telugu?: string;
+  };
   googleColabUrl?: string;
   simulators?: string[];
   completed: boolean;
@@ -54,6 +71,26 @@ interface ModuleContentProps {
   courseId: string;
   moduleId: string;
 }
+
+// Helper function to get simulator URL (returns direct simulator path for specific modules, or subject path for others)
+const getSimulatorUrl = (moduleId: string, moduleTitle: string, courseId: string, courseTitle: string): string => {
+  const moduleIdLower = moduleId?.toLowerCase() || '';
+  const moduleTitleLower = moduleTitle?.toLowerCase() || '';
+  const courseIdLower = courseId?.toLowerCase() || '';
+  const courseTitleLower = courseTitle?.toLowerCase() || '';
+  
+  // Check for LLMs module - route directly to LLM simulator
+  if (moduleIdLower.includes('llm') || 
+      moduleIdLower.includes('llms') ||
+      moduleTitleLower.includes('llm') ||
+      moduleTitleLower.includes('llms') ||
+      moduleTitleLower.includes('large language model')) {
+    return '/3d-simulators/genai/llm-simulator';
+  }
+  
+  // For other modules, return subject path (will show list of simulators)
+  return `/3d-simulators/${getSimulatorSubject(moduleId, moduleTitle, courseId, courseTitle)}`;
+};
 
 // Helper function to map module/course to simulator subject
 const getSimulatorSubject = (moduleId: string, moduleTitle: string, courseId: string, courseTitle: string): string => {
@@ -215,6 +252,7 @@ export default function ModuleContent({ courseId, moduleId }: ModuleContentProps
   const [quizScore, setQuizScore] = useState(0);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [speechSupported, setSpeechSupported] = useState(false);
+  const [selectedVideoLanguage, setSelectedVideoLanguage] = useState<'english' | 'hindi' | 'telugu'>('english');
 
   const loadQuizForModule = React.useCallback(
     async (subjectId: string, subModuleId: string | undefined) => {
@@ -263,6 +301,8 @@ export default function ModuleContent({ courseId, moduleId }: ModuleContentProps
       window.speechSynthesis.cancel();
       setIsSpeaking(false);
     }
+    // Reset to English when lesson changes
+    setSelectedVideoLanguage('english');
   }, [moduleId, currentLesson]);
 
   // Load subject (moduleId) and its modules from Firebase
@@ -339,6 +379,8 @@ export default function ModuleContent({ courseId, moduleId }: ModuleContentProps
                       pptTitle: t.pptTitle || '',
                       pptUrl: t.pptUrl || '',
                       googleColabUrl: t.googleColabUrl || '',
+                      videoUrl: t.videoUrl || '',
+                      videoUrls: t.videoUrls || undefined,
                     }));
                 }
               } catch (error) {
@@ -353,6 +395,8 @@ export default function ModuleContent({ courseId, moduleId }: ModuleContentProps
                 name: m.name || `Module ${index + 1}`,
                 order: m.order ?? index,
                 topics: topics,
+                videoUrl: m.videoUrl || '',
+                videoUrls: m.videoUrls || undefined,
               };
             });
           
@@ -382,6 +426,8 @@ export default function ModuleContent({ courseId, moduleId }: ModuleContentProps
                 pptTitle: topic.pptTitle,
                 pptUrl: topic.pptUrl,
                 googleColabUrl: topic.googleColabUrl,
+                videoUrl: topic.videoUrl,
+                videoUrls: topic.videoUrls,
               }));
             setLessons(topicsAsLessons);
             setCurrentLesson(0);
@@ -403,6 +449,8 @@ export default function ModuleContent({ courseId, moduleId }: ModuleContentProps
                 pptTitle: topic.pptTitle,
                 pptUrl: topic.pptUrl,
                 googleColabUrl: topic.googleColabUrl,
+                videoUrl: topic.videoUrl,
+                videoUrls: topic.videoUrls,
               }));
             setLessons(topicsAsLessons);
             setCurrentLesson(0);
@@ -457,6 +505,8 @@ export default function ModuleContent({ courseId, moduleId }: ModuleContentProps
           moduleId,
           `${module.id}-${topic.id}`
         ),
+        videoUrl: topic.videoUrl,
+        videoUrls: topic.videoUrls,
         order: topic.order,
         pptTitle: topic.pptTitle,
         pptUrl: topic.pptUrl,
@@ -500,7 +550,8 @@ export default function ModuleContent({ courseId, moduleId }: ModuleContentProps
       courseId,
       moduleId,
       currentLessonData.id,
-      true
+      true,
+      lessons.length
     );
   };
 
@@ -639,6 +690,75 @@ export default function ModuleContent({ courseId, moduleId }: ModuleContentProps
     return elements.length > 0 ? elements : null;
   };
 
+  // Helper function to get video URL for selected language: topic-level takes priority, fallback to module-level
+  const getVideoUrl = (language: 'english' | 'hindi' | 'telugu' = selectedVideoLanguage): string | null => {
+    const currentLessonData = lessons[currentLesson];
+    
+    // First, check if current topic/lesson has videoUrls (new format)
+    if (currentLessonData?.videoUrls) {
+      const langUrl = currentLessonData.videoUrls[language];
+      if (langUrl && langUrl.trim()) {
+        return langUrl.trim();
+      }
+      // Fallback to English if selected language not available
+      if (language !== 'english' && currentLessonData.videoUrls.english && currentLessonData.videoUrls.english.trim()) {
+        return currentLessonData.videoUrls.english.trim();
+      }
+    }
+    
+    // Backward compatibility: check old videoUrl format
+    if (currentLessonData?.videoUrl && currentLessonData.videoUrl.trim()) {
+      return currentLessonData.videoUrl.trim();
+    }
+    
+    // If no topic-level video, check module-level video
+    if (selectedModuleIndex !== null && subjectModules[selectedModuleIndex]) {
+      const module = subjectModules[selectedModuleIndex];
+      
+      // Check new format first
+      if (module.videoUrls) {
+        const langUrl = module.videoUrls[language];
+        if (langUrl && langUrl.trim()) {
+          return langUrl.trim();
+        }
+        // Fallback to English
+        if (language !== 'english' && module.videoUrls.english && module.videoUrls.english.trim()) {
+          return module.videoUrls.english.trim();
+        }
+      }
+      
+      // Backward compatibility
+      if (module.videoUrl && module.videoUrl.trim()) {
+        return module.videoUrl.trim();
+      }
+    }
+    
+    return null;
+  };
+  
+  // Helper to check if any language video is available
+  const hasAnyVideo = (): boolean => {
+    return isValidVideoUrl(getVideoUrl('english')) || 
+           isValidVideoUrl(getVideoUrl('hindi')) || 
+           isValidVideoUrl(getVideoUrl('telugu'));
+  };
+  
+  // Helper to get available languages
+  const getAvailableLanguages = (): Array<'english' | 'hindi' | 'telugu'> => {
+    const available: Array<'english' | 'hindi' | 'telugu'> = [];
+    if (isValidVideoUrl(getVideoUrl('english'))) available.push('english');
+    if (isValidVideoUrl(getVideoUrl('hindi'))) available.push('hindi');
+    if (isValidVideoUrl(getVideoUrl('telugu'))) available.push('telugu');
+    return available;
+  };
+
+  // Helper function to check if video URL is valid
+  const isValidVideoUrl = (url: string | null | undefined): boolean => {
+    if (!url) return false;
+    const trimmed = url.trim();
+    return trimmed.length > 0;
+  };
+
   const renderVideoContent = (url: string) => {
     if (!url) return null;
 
@@ -650,7 +770,7 @@ export default function ModuleContent({ courseId, moduleId }: ModuleContentProps
     );
 
     if (youtubeMatch?.[1]) {
-      const embedUrl = `https://www.youtube.com/embed/${youtubeMatch[1]}`;
+      const embedUrl = `https://www.youtube.com/embed/${youtubeMatch[1]}?rel=0&modestbranding=1`;
       return (
         <div className="mb-6 aspect-video">
           <iframe
@@ -930,28 +1050,48 @@ export default function ModuleContent({ courseId, moduleId }: ModuleContentProps
           </div>
 
           {/* Video Lectures and Simulators Section */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
-            {/* Video Lectures Section - Takes 2 columns */}
-            <div className="lg:col-span-2 glass p-6 rounded-xl">
-              <div className="flex items-center gap-3 mb-4">
-                <Video className="w-5 h-5 text-primary" />
-                <h3 className="text-xl font-bold text-text">Video Lectures</h3>
-              </div>
-              <div className="bg-card/50 rounded-xl p-4 flex items-center justify-center min-h-[400px]">
-                {lessons[currentLesson]?.videoUrl ? (
+          <div className={`grid grid-cols-1 ${hasAnyVideo() ? 'lg:grid-cols-3' : 'lg:grid-cols-1'} gap-6 mb-6`}>
+            {/* Video Lectures Section - Only render if valid video URL exists */}
+            {hasAnyVideo() && (
+              <div className="lg:col-span-2 glass p-6 rounded-xl">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-3">
+                    <Video className="w-5 h-5 text-primary" />
+                    <h3 className="text-xl font-bold text-text">Video Lectures</h3>
+                  </div>
+                  
+                  {/* Language Switcher */}
+                  {getAvailableLanguages().length > 1 && (
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-textSecondary">Language:</span>
+                      <div className="flex gap-1 rounded-lg border border-card/50 bg-card/30 p-1">
+                        {getAvailableLanguages().map((lang) => (
+                          <button
+                            key={lang}
+                            type="button"
+                            onClick={() => setSelectedVideoLanguage(lang)}
+                            className={`px-3 py-1.5 text-xs font-medium rounded transition ${
+                              selectedVideoLanguage === lang
+                                ? 'bg-primary text-white'
+                                : 'text-textSecondary hover:text-text hover:bg-card/50'
+                            }`}
+                          >
+                            {lang === 'english' ? 'English' : lang === 'hindi' ? 'Hindi/Urdu' : 'Telugu'}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+                <div className="bg-card/50 rounded-xl p-4">
                   <div className="w-full aspect-video">
-                    {renderVideoContent(lessons[currentLesson]?.videoUrl || '')}
+                    {renderVideoContent(getVideoUrl() || '')}
                   </div>
-                ) : (
-                  <div className="text-center">
-                    <Video className="w-20 h-20 text-textSecondary mx-auto mb-4" />
-                    <p className="text-textSecondary">No videos available yet</p>
-                  </div>
-                )}
+                </div>
               </div>
-            </div>
+            )}
 
-            {/* Simulator Box - Takes 1 column */}
+            {/* Simulator Box - Takes full width if no video, otherwise 1 column */}
             <div className="glass p-6 rounded-xl">
               <div className="flex items-center gap-3 mb-4">
                 <Boxes className="w-5 h-5 text-primary" />
@@ -965,7 +1105,7 @@ export default function ModuleContent({ courseId, moduleId }: ModuleContentProps
                   </p>
                 </div>
                 <Link
-                  href={`/3d-simulators/${getSimulatorSubject(moduleId, moduleTitle, courseId, courseTitle)}`}
+                  href={getSimulatorUrl(moduleId, moduleTitle, courseId, courseTitle)}
                   onClick={() => {
                     if (typeof window !== 'undefined' && pathname) {
                       sessionStorage.setItem('simulatorReturnUrl', pathname);

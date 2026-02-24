@@ -4,7 +4,6 @@ import React, { useState, useEffect, useRef, ChangeEvent, Suspense } from 'react
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Play, Upload, Trash2, Loader2, Brain, Target, Grid3x3 } from 'lucide-react';
-import { useSearchParams } from 'next/navigation';
 
 // Declare Pyodide types
 declare global {
@@ -16,9 +15,12 @@ declare global {
 const HTML_MARKER = '__HTML_OUTPUT__';
 type RichOutput = { type: 'html' | 'image' | 'text'; value: string };
 
-function CodeSimulatorContent() {
-  const searchParams = useSearchParams();
-  const simulatorType = searchParams.get('type') || 'default';
+function CodeSimulatorContent({ initialType }: { initialType?: string }) {
+  const [simulatorType, setSimulatorType] = useState(initialType || 'default');
+
+  useEffect(() => {
+    if (initialType) setSimulatorType(initialType);
+  }, [initialType]);
   
   const [code, setCode] = useState(`# Welcome to AI Code Editor
 # Preloaded libraries: numpy, pandas, scikit-learn, matplotlib, scipy
@@ -1057,7 +1059,22 @@ print(json.dumps(result, indent=2))
   );
 }
 
-export default function CodeSimulatorPage() {
+function CodeSimulatorWrapper({
+  searchParams,
+}: {
+  searchParams?: Promise<{ [key: string]: string | string[] | undefined }>;
+}) {
+  const resolved = searchParams ? React.use(searchParams) : ({} as Record<string, string | string[] | undefined>);
+  const typeParam = resolved?.type;
+  const initialType = typeof typeParam === 'string' ? typeParam : Array.isArray(typeParam) ? typeParam[0] : 'default';
+  return <CodeSimulatorContent initialType={initialType || 'default'} />;
+}
+
+export default function CodeSimulatorPage({
+  searchParams,
+}: {
+  searchParams?: Promise<{ [key: string]: string | string[] | undefined }>;
+}) {
   return (
     <Suspense fallback={
       <DashboardLayout>
@@ -1069,7 +1086,7 @@ export default function CodeSimulatorPage() {
         </div>
       </DashboardLayout>
     }>
-      <CodeSimulatorContent />
+      <CodeSimulatorWrapper searchParams={searchParams} />
     </Suspense>
   );
 }

@@ -24,6 +24,26 @@ const ensureFirebase = async (): Promise<boolean> => {
   }
 };
 
+// Helper function to remove undefined values from objects (Firebase doesn't allow undefined)
+const removeUndefinedValues = (obj: any): any => {
+  if (obj === null || obj === undefined) {
+    return null;
+  }
+  if (Array.isArray(obj)) {
+    return obj.map(item => removeUndefinedValues(item));
+  }
+  if (typeof obj === 'object') {
+    const cleaned: any = {};
+    for (const key in obj) {
+      if (obj[key] !== undefined) {
+        cleaned[key] = removeUndefinedValues(obj[key]);
+      }
+    }
+    return cleaned;
+  }
+  return obj;
+};
+
 export const adminService = {
   // ===== Courses =====
   async getCourses() {
@@ -184,6 +204,7 @@ export const adminService = {
     return docRef.id;
   },
 
+
   async updateModule(moduleId: string, updates: Record<string, any>) {
     await ensureFirebase();
     // Use merge: true to ensure all existing fields are preserved
@@ -216,12 +237,16 @@ export const adminService = {
             topics: (updateModule.topics || []).map((updateTopic: any) => {
               const existingTopic = (existingModule.topics || []).find((et: any) => et.id === updateTopic.id) || {};
               return {
-                ...existingTopic, // Start with existing topic data (includes googleColabUrl)
+                ...existingTopic, // Start with existing topic data (includes googleColabUrl, videoUrls)
                 ...updateTopic, // Apply updates
-                // CRITICAL: Always preserve googleColabUrl, pptUrl, pptTitle - never remove them
+                // CRITICAL: Always preserve googleColabUrl, pptUrl, pptTitle, videoUrl, videoUrls - never remove them
                 googleColabUrl: updateTopic.googleColabUrl || existingTopic.googleColabUrl || '',
                 pptUrl: updateTopic.pptUrl || existingTopic.pptUrl || '',
                 pptTitle: updateTopic.pptTitle || existingTopic.pptTitle || '',
+                videoUrl: updateTopic.videoUrl || existingTopic.videoUrl || '',
+                // Preserve videoUrls object - merge if both exist, otherwise use whichever is available
+                // Only include videoUrls if it exists (don't set undefined)
+                ...(updateTopic.videoUrls || existingTopic.videoUrls ? { videoUrls: updateTopic.videoUrls || existingTopic.videoUrls } : {}),
               };
             }),
           };
@@ -240,18 +265,22 @@ export const adminService = {
         modules: mergedModules,
         updatedAt: serverTimestamp(),
       };
-      await setDoc(moduleRef, mergedUpdates, { merge: true });
+      // Remove undefined values before saving (Firebase doesn't allow undefined)
+      const cleanedUpdates = removeUndefinedValues(mergedUpdates);
+      await setDoc(moduleRef, cleanedUpdates, { merge: true });
     } else {
       // If document doesn't exist, create it
       const dataToSave = { ...updates };
       if (!Array.isArray(dataToSave.applicableCourses)) {
         dataToSave.applicableCourses = dataToSave.applicableCourses ? [dataToSave.applicableCourses] : [];
       }
-      await setDoc(moduleRef, {
+      // Remove undefined values before saving (Firebase doesn't allow undefined)
+      const cleanedData = removeUndefinedValues({
         ...dataToSave,
         updatedAt: serverTimestamp(),
         createdAt: serverTimestamp(),
       });
+      await setDoc(moduleRef, cleanedData);
     }
   },
 
@@ -557,6 +586,38 @@ export const adminService = {
     } catch (error) {
       console.error('Error removing simulator from module:', error);
       throw error;
+    }
+  },
+
+  // ===== Leads (newsletter/subscription) =====
+  async addLead(email: string) {
+    await ensureFirebase();
+    const docRef = await addDoc(collection(db, 'leads'), {
+      email: email.trim().toLowerCase(),
+      source: 'newsletter',
+      createdAt: serverTimestamp(),
+    });
+    return docRef.id;
+  },
+
+  async getLeads() {
+    try {
+      await ensureFirebase();
+      if (!db) return [];
+      const snapshot = await getDocs(collection(db, 'leads'));
+      return snapshot.docs
+        .map((docSnap) => ({
+          id: docSnap.id,
+          ...docSnap.data(),
+        }))
+        .sort((a: any, b: any) => {
+          const aDate = a.createdAt?.toDate ? a.createdAt.toDate().getTime() : a.createdAt ? new Date(a.createdAt).getTime() : 0;
+          const bDate = b.createdAt?.toDate ? b.createdAt.toDate().getTime() : b.createdAt ? new Date(b.createdAt).getTime() : 0;
+          return bDate - aDate;
+        });
+    } catch (error) {
+      console.error('Error fetching leads:', error);
+      return [];
     }
   },
 

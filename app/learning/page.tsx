@@ -5,7 +5,6 @@ import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { motion } from 'framer-motion';
 import { BookOpen, Clock, Play, CheckCircle } from 'lucide-react';
 import Link from 'next/link';
-import { useSearchParams } from 'next/navigation';
 import { learningProgressService } from '@/lib/services/learningProgressService';
 import { adminService } from '@/lib/services/adminService';
 
@@ -43,19 +42,14 @@ const getDifficultyColor = (difficulty: string) => {
   }
 };
 
-function LearningHubContent() {
-  const searchParams = useSearchParams();
-  const [selectedCourse, setSelectedCourse] = useState<string | null>(null);
+function LearningHubContent({ initialCourse }: { initialCourse?: string | null }) {
+  const [selectedCourse, setSelectedCourse] = useState<string | null>(initialCourse ?? null);
   const [courses, setCourses] = useState<Course[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Check for course query parameter on mount
   useEffect(() => {
-    const courseParam = searchParams?.get('course');
-    if (courseParam) {
-      setSelectedCourse(courseParam);
-    }
-  }, [searchParams]);
+    if (initialCourse) setSelectedCourse(initialCourse);
+  }, [initialCourse]);
 
   // Fetch courses from Firebase
   useEffect(() => {
@@ -287,7 +281,22 @@ function LearningHubContent() {
   );
 }
 
-export default function LearningHubPage() {
+function LearningHubWrapper({
+  searchParams,
+}: {
+  searchParams?: Promise<{ [key: string]: string | string[] | undefined }>;
+}) {
+  const resolved = searchParams ? React.use(searchParams) : ({} as Record<string, string | string[] | undefined>);
+  const course = resolved?.course;
+  const initialCourse = typeof course === 'string' ? course : Array.isArray(course) ? course[0] ?? null : null;
+  return <LearningHubContent initialCourse={initialCourse} />;
+}
+
+export default function LearningHubPage({
+  searchParams,
+}: {
+  searchParams?: Promise<{ [key: string]: string | string[] | undefined }>;
+}) {
   return (
     <Suspense fallback={
       <DashboardLayout>
@@ -298,7 +307,7 @@ export default function LearningHubPage() {
         </div>
       </DashboardLayout>
     }>
-      <LearningHubContent />
+      <LearningHubWrapper searchParams={searchParams} />
     </Suspense>
   );
 }

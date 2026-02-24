@@ -1,18 +1,22 @@
 'use client';
 
 import { useEffect } from 'react';
-import { useRouter, useParams } from 'next/navigation';
+import { use } from 'react';
+import { useRouter } from 'next/navigation';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Loader2 } from 'lucide-react';
 
-export default function CourseSubjectsPage() {
+export default function CourseSubjectsPage({
+  params,
+}: {
+  params: Promise<{ courseId?: string }>;
+}) {
   const router = useRouter();
-  const params = useParams();
-  const courseId = params?.courseId as string;
+  const resolved = use(params);
+  const courseId = resolved?.courseId || '';
 
   useEffect(() => {
     if (courseId) {
-      // Redirect to learning page with course selected via query parameter
       router.replace(`/learning?course=${courseId}`);
     } else {
       router.replace('/learning');

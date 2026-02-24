@@ -83,6 +83,18 @@ service cloud.firestore {
       allow read: if request.auth != null;
       allow write: if isAdmin();
     }
+
+    // Leads collection (newsletter/subscription - public create, admin read)
+    match /leads/{leadId} {
+      allow create: if true;
+      allow read, update, delete: if isAdmin();
+    }
+
+    // MNc collection (Resume Templates)
+    match /MNc/{templateId} {
+      allow read: if request.auth != null;
+      allow write: if isAdmin();
+    }
   }
 }
 

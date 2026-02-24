@@ -5,7 +5,7 @@ import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
-import { Users, BookOpen, FlaskConical, MessageSquare, Plus, Edit, Trash2, TrendingUp, Clock, ChevronDown, ListChecks, FileText, X } from 'lucide-react';
+import { Users, BookOpen, FlaskConical, MessageSquare, Plus, Edit, Trash2, TrendingUp, Clock, ChevronDown, ListChecks, FileText, X, Mail } from 'lucide-react';
 import { adminService } from '@/lib/services/adminService';
 import CourseModal from '@/components/admin/CourseModal';
 import ProjectModal from '@/components/admin/ProjectModal';
@@ -13,7 +13,7 @@ import SubjectModal from '@/components/admin/SubjectModal';
 import TopicModal from '@/components/admin/TopicModal';
 import QuizModal, { QuizQuestion } from '@/components/admin/QuizModal';
 
-type AdminTab = 'dashboard' | 'courses' | 'subjects' | 'topics' | 'quizzes' | 'practiceTests' | 'projects' | 'users' | 'faq';
+type AdminTab = 'dashboard' | 'courses' | 'subjects' | 'topics' | 'quizzes' | 'practiceTests' | 'projects' | 'users' | 'leads' | 'faq';
 
 const tabs: Array<{ id: AdminTab; label: string; icon: React.ElementType }> = [
   { id: 'dashboard', label: 'Dashboard', icon: TrendingUp },
@@ -24,6 +24,7 @@ const tabs: Array<{ id: AdminTab; label: string; icon: React.ElementType }> = [
   { id: 'practiceTests', label: 'Practice Tests', icon: FileText },
   { id: 'projects', label: 'Projects', icon: FlaskConical },
   { id: 'users', label: 'Users', icon: Users },
+  { id: 'leads', label: 'Manage Leads', icon: Mail },
   { id: 'faq', label: 'FAQ', icon: MessageSquare },
 ];
 
@@ -77,6 +78,7 @@ export default function AdminPanelPage() {
   const [subjects, setSubjects] = useState<any[]>([]);
   const [projects, setProjects] = useState<any[]>([]);
   const [users, setUsers] = useState<any[]>([]);
+  const [leads, setLeads] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [showCourseModal, setShowCourseModal] = useState(false);
   const [editingCourse, setEditingCourse] = useState<any>(null);
@@ -322,6 +324,11 @@ export default function AdminPanelPage() {
       if (activeTab === 'users') {
         const usersData = await adminService.getUsers();
         setUsers(usersData);
+      }
+
+      if (activeTab === 'leads') {
+        const leadsData = await adminService.getLeads();
+        setLeads(leadsData);
       }
     } catch (error) {
       console.error('Error loading admin data:', error);
@@ -579,24 +586,26 @@ export default function AdminPanelPage() {
           <p className="text-textSecondary">Manage content, users, and platform settings</p>
         </motion.div>
 
-        <div className="flex gap-4 border-b border-card">
-          {tabs.map((tab) => {
-            const Icon = tab.icon;
-            return (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`flex items-center gap-2 border-b-2 px-4 py-3 transition ${
-                  activeTab === tab.id
-                    ? 'border-primary text-primary'
-                    : 'border-transparent text-textSecondary hover:text-text'
-                }`}
-              >
-                <Icon className="h-5 w-5" />
-                {tab.label}
-              </button>
-            );
-          })}
+        <div className="overflow-x-auto border-b border-card">
+          <div className="flex min-w-0 flex-wrap gap-2 py-1">
+            {tabs.map((tab) => {
+              const Icon = tab.icon;
+              return (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id)}
+                  className={`flex shrink-0 items-center gap-1.5 whitespace-nowrap border-b-2 px-3 py-2 text-sm transition ${
+                    activeTab === tab.id
+                      ? 'border-primary text-primary'
+                      : 'border-transparent text-textSecondary hover:text-text'
+                  }`}
+                >
+                  <Icon className="h-4 w-4" />
+                  {tab.label}
+                </button>
+              );
+            })}
+          </div>
         </div>
 
         {activeTab === 'dashboard' && (
@@ -1516,6 +1525,66 @@ export default function AdminPanelPage() {
                               {typeof userItem.createdAt?.toDate === 'function'
                                 ? userItem.createdAt.toDate().toLocaleDateString()
                                 : new Date(userItem.createdAt).toLocaleDateString()}
+                            </span>
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </motion.div>
+        )}
+
+        {activeTab === 'leads' && (
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="space-y-4">
+            <div className="flex items-center justify-between">
+              <h2 className="text-xl font-bold text-text">Contact Info</h2>
+              <button
+                onClick={async () => {
+                  const email = window.prompt('Enter email address:');
+                  if (!email?.trim()) return;
+                  try {
+                    await adminService.addLead(email.trim());
+                    await loadData();
+                  } catch (e) {
+                    console.error(e);
+                    alert('Failed to add lead.');
+                  }
+                }}
+                className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary/90"
+              >
+                <Plus className="h-4 w-4" />
+                Add Lead
+              </button>
+            </div>
+            <div className="glass rounded-xl p-6">
+              {loading ? (
+                <div className="py-8 text-center text-textSecondary">Loading leads...</div>
+              ) : leads.length === 0 ? (
+                <div className="py-8 text-center text-textSecondary">No leads yet.</div>
+              ) : (
+                <div className="divide-y divide-card/60">
+                  {leads.map((lead) => (
+                    <div key={lead.id} className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 py-4">
+                      <div className="flex items-center gap-4">
+                        <div className="h-12 w-12 rounded-full bg-primary/20 border border-primary/40 flex items-center justify-center text-primary font-semibold">
+                          <Mail className="h-6 w-6" />
+                        </div>
+                        <div>
+                          <p className="font-semibold text-text">{lead.email || 'No email'}</p>
+                          <p className="text-sm text-textSecondary">Source: {lead.source || 'newsletter'}</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-3 text-sm text-textSecondary">
+                        {lead.createdAt && (
+                          <span className="inline-flex items-center gap-2 rounded-full bg-card/80 px-3 py-1">
+                            Subscribed:{' '}
+                            <span className="font-medium text-text">
+                              {typeof lead.createdAt?.toDate === 'function'
+                                ? lead.createdAt.toDate().toLocaleDateString()
+                                : new Date(lead.createdAt).toLocaleDateString()}
                             </span>
                           </span>
                         )}

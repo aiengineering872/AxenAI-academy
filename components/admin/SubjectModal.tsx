@@ -21,6 +21,12 @@ interface Topic {
   pptTitle?: string;
   pptUrl?: string;
   googleColabUrl?: string;
+  videoUrl?: string; // Backward compatibility
+  videoUrls?: {
+    english?: string;
+    hindi?: string;
+    telugu?: string;
+  };
 }
 
 interface Module {
@@ -108,6 +114,8 @@ export const SubjectModal: React.FC<SubjectModalProps> = ({
             pptTitle: t.pptTitle || '',
             pptUrl: t.pptUrl || '',
             googleColabUrl: t.googleColabUrl || '',
+            videoUrl: t.videoUrl || '',
+            videoUrls: t.videoUrls || undefined,
           })),
         }));
         setModules(loadedModules);
@@ -203,10 +211,13 @@ export const SubjectModal: React.FC<SubjectModalProps> = ({
             // CRITICAL: Preserve all topics with their googleColabUrl intact when updating module fields
             topics: (m.topics || []).map((t: Topic) => ({
               ...t,
-              // Always preserve googleColabUrl, pptUrl, and pptTitle - never remove them
+              // Always preserve googleColabUrl, pptUrl, pptTitle, videoUrl, and videoUrls - never remove them
               googleColabUrl: t.googleColabUrl ?? '',
               pptUrl: t.pptUrl ?? '',
               pptTitle: t.pptTitle ?? '',
+              videoUrl: t.videoUrl ?? '',
+              // Only include videoUrls if it exists (don't set undefined)
+              ...(t.videoUrls ? { videoUrls: t.videoUrls } : {}),
             })),
           };
         }
@@ -269,10 +280,13 @@ export const SubjectModal: React.FC<SubjectModalProps> = ({
                 ? { 
                     ...t, 
                     [field]: value,
-                    // CRITICAL: Always preserve googleColabUrl, pptUrl, and pptTitle - never remove them
+                    // CRITICAL: Always preserve googleColabUrl, pptUrl, pptTitle, videoUrl, and videoUrls - never remove them
                     googleColabUrl: t.googleColabUrl ?? '',
                     pptUrl: t.pptUrl ?? '',
                     pptTitle: t.pptTitle ?? '',
+                    videoUrl: t.videoUrl ?? '',
+                    // Only include videoUrls if it exists (don't set undefined)
+                    ...(t.videoUrls ? { videoUrls: t.videoUrls } : {}),
                   } 
                 : t
             ),
@@ -320,10 +334,13 @@ export const SubjectModal: React.FC<SubjectModalProps> = ({
                   name: t.name || '',
                   content: t.content || '',
                   order: t.order ?? 0,
-                  // Preserve PPT and Google Colab fields to prevent data loss
+                  // Preserve PPT, Google Colab, and Video fields to prevent data loss
                   pptTitle: t.pptTitle ?? '',
                   pptUrl: t.pptUrl ?? '',
                   googleColabUrl: t.googleColabUrl ?? '',
+                  videoUrl: t.videoUrl ?? '',
+                  // Only include videoUrls if it exists (don't set undefined)
+                  ...(t.videoUrls ? { videoUrls: t.videoUrls } : {}),
                 }));
             }
             

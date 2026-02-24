@@ -1,9 +1,10 @@
 'use client';
 
 import React from 'react';
+import { use } from 'react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Code, Brain, Network, Sparkles, ArrowLeft, Database } from 'lucide-react';
-import { useRouter, useParams } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import dynamic from 'next/dynamic';
 
@@ -59,6 +60,12 @@ const machineLearningSimulators = [
 
 const genAISimulators = [
   { 
+    id: 'llm-simulator', 
+    name: 'LLM Simulator', 
+    description: 'Educational visualization of how Large Language Models process text',
+    icon: Sparkles 
+  },
+  { 
     id: 'prompt-engineering', 
     name: 'Prompt Engineering Simulator', 
     description: 'Experiment with prompts and see how parameters affect AI outputs',
@@ -73,13 +80,29 @@ const genAISimulators = [
 ];
 
 
-export default function SubjectSimulatorsPage() {
+export default function SubjectSimulatorsPage({
+  params,
+}: {
+  params: Promise<{ subject?: string }>;
+}) {
   const router = useRouter();
-  const params = useParams();
-  // Access params directly - useParams() in client components is synchronous
-  const subjectId = (params?.subject as string) || 'python';
-  
+  const resolved = use(params);
+  const subjectId = (resolved?.subject as string) || 'python';
   const currentSubject = subjects.find(s => s.id === subjectId) || subjects[0];
+
+  // Check if user came from AI Engineering course
+  const [isFromAIEngineering, setIsFromAIEngineering] = React.useState(false);
+
+  React.useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const returnUrl = sessionStorage.getItem('simulatorReturnUrl') || '';
+      // Check if return URL contains AI Engineering course identifier
+      const isAIEngineering = returnUrl.toLowerCase().includes('ai-engineering') || 
+                             returnUrl.toLowerCase().includes('ai_engineering') ||
+                             returnUrl.toLowerCase().includes('ai engineering');
+      setIsFromAIEngineering(isAIEngineering);
+    }
+  }, []);
 
   return (
     <DashboardLayout>
@@ -236,7 +259,15 @@ export default function SubjectSimulatorsPage() {
 
                 {/* GenAI Simulator Cards */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {genAISimulators.map((simulator) => (
+                  {genAISimulators
+                    .filter((simulator) => {
+                      // Only show LLM simulator if user came from AI Engineering course
+                      if (simulator.id === 'llm-simulator') {
+                        return isFromAIEngineering;
+                      }
+                      return true;
+                    })
+                    .map((simulator) => (
                     <div
                       key={simulator.id}
                       className="bg-card/50 backdrop-blur rounded-xl p-6 border border-primary/20 cursor-pointer hover:border-primary/40 hover:shadow-glow transition-all"

@@ -1,7 +1,6 @@
 {
   "name": "axen-ai-engineering-platform",
   "version": "1.0.0",
-  "description": "AXEN - AI Engineering Learning Platform",
   "private": true,
   "scripts": {
     "dev": "next dev",
@@ -35,6 +34,8 @@
     "@types/react": "^18.3.11",
     "@types/react-dom": "^18.3.0",
     "autoprefixer": "^10.4.20",
+    "eslint": "9.39.3",
+    "eslint-config-next": "16.1.6",
     "postcss": "^8.4.47",
     "tailwindcss": "^3.4.13",
     "typescript": "^5.6.2"

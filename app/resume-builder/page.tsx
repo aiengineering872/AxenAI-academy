@@ -2,11 +2,21 @@
 
 import React, { useEffect, useMemo, useState } from 'react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
-import { motion } from 'framer-motion';
-import { UserRound, Download, Sparkles, Save, Plus, Trash2, Bot } from 'lucide-react';
+import { UserRound, Download, Sparkles, Plus, Trash2, X } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { generateGeminiResponse } from '@/lib/utils/gemini';
-// jsPDF will be dynamically imported
+
+const EXPERIENCE_LEVEL_OPTIONS = [
+  'Beginner',
+  'Intermediate',
+  'Advanced',
+  'Fresher',
+  '1–2 Years',
+  '3–5 Years',
+  '5+ Years',
+] as const;
+
+type ExperienceLevel = (typeof EXPERIENCE_LEVEL_OPTIONS)[number];
 
 interface ResumeData {
   personalInfo: {
@@ -14,28 +24,25 @@ interface ResumeData {
     email: string;
     phone: string;
     location: string;
-    linkedin?: string;
-    github?: string;
+    linkedin: string;
+    github: string;
   };
   summary: string;
+  skills: string[];
+  experienceLevel: ExperienceLevel;
   experience: Array<{
     title: string;
     company: string;
     duration: string;
     description: string;
   }>;
-  education: Array<{
-    degree: string;
-    institution: string;
-    year: string;
-  }>;
-  skills: string[];
-  projects: Array<{
-    name: string;
-    description: string;
-    technologies: string[];
-  }>;
+  education: Array<{ degree: string; institution: string; year: string }>;
+  certificates: Array<{ name: string; issuer: string; year: string }>;
 }
+
+const initialEducation = () => ({ degree: '', institution: '', year: '' });
+const initialCertificate = () => ({ name: '', issuer: '', year: '' });
+const initialExperience = () => ({ title: '', company: '', duration: '', description: '' });
 
 export default function ResumeBuilderPage() {
   const { user } = useAuth();
@@ -49,576 +56,645 @@ export default function ResumeBuilderPage() {
       github: '',
     },
     summary: '',
-    experience: [],
-    education: [],
     skills: [],
-    projects: [],
+    experienceLevel: 'Fresher',
+    experience: [],
+    education: [initialEducation()],
+    certificates: [initialCertificate()],
   });
-  const [generatingSection, setGeneratingSection] = useState<string | null>(null);
-  const [selectedTemplate, setSelectedTemplate] = useState('modern');
-  const [geminiApiKey, setGeminiApiKey] = useState<string | null>(null);
-  const [apiKeyWarning, setApiKeyWarning] = useState<string | null>(null);
-  const [experienceLevel, setExperienceLevel] = useState<'fresher' | 'experienced'>('experienced');
   const [pendingSkill, setPendingSkill] = useState('');
+  const [geminiApiKey, setGeminiApiKey] = useState<string | null>(null);
+  const [generatingSummary, setGeneratingSummary] = useState(false);
+  const [generatingResume, setGeneratingResume] = useState(false);
+  const [showFullPageResume, setShowFullPageResume] = useState(false);
 
-  const personalInfoFields: Array<{
-    key: keyof ResumeData['personalInfo'];
-    label: string;
-    type?: string;
-    placeholder: string;
-  }> = [
-    { key: 'name', label: 'Full Name', placeholder: 'Full Name' },
-    { key: 'email', label: 'Email', type: 'email', placeholder: 'Email' },
-    { key: 'phone', label: 'Phone', type: 'tel', placeholder: 'Phone' },
-    { key: 'location', label: 'Location', placeholder: 'Location' },
-    { key: 'linkedin', label: 'LinkedIn URL', placeholder: 'LinkedIn URL' },
-    { key: 'github', label: 'GitHub URL', placeholder: 'GitHub URL' },
-  ];
-
-  const canUseAI = useMemo(() => Boolean(geminiApiKey) && generatingSection === null, [geminiApiKey, generatingSection]);
-  const isResumeReady = useMemo(() => {
-    const { personalInfo } = resumeData;
-    return Boolean(
-      personalInfo.name &&
-      personalInfo.email &&
-      personalInfo.phone &&
-      personalInfo.location &&
-      personalInfo.linkedin &&
-      personalInfo.github
-    );
-  }, [resumeData]);
-
-  const experienceComplete = useMemo(() => {
-    if (experienceLevel === 'fresher') return true;
-    return (
-      resumeData.experience.length > 0 &&
-      resumeData.experience.every(
-        (exp) => exp.title && exp.company && exp.duration && exp.description
-      )
-    );
-  }, [resumeData.experience, experienceLevel]);
-
-  const educationComplete = useMemo(
-    () =>
-      resumeData.education.length > 0 &&
-      resumeData.education.every((edu) => edu.degree && edu.institution && edu.year),
-    [resumeData.education]
-  );
-
-  const skillsComplete = useMemo(
-    () => resumeData.skills.length > 0 || pendingSkill.trim().length > 0,
-    [resumeData.skills, pendingSkill]
-  );
-
-  const projectsComplete = useMemo(
-    () =>
-      resumeData.projects.length > 0 &&
-      resumeData.projects.every((proj) => proj.name && proj.description),
-    [resumeData.projects]
-  );
-
-  const missingSections = useMemo(() => {
-    const missing: string[] = [];
-    if (!isResumeReady) missing.push('personal information');
-    if (!skillsComplete) missing.push('skills');
-    if (!educationComplete) missing.push('education');
-    if (!projectsComplete) missing.push('projects');
-    if (!experienceComplete) missing.push('experience');
-    return missing;
-  }, [isResumeReady, skillsComplete, educationComplete, projectsComplete, experienceComplete]);
-
-  const canGenerateFullResume = useMemo(
-    () =>
-      Boolean(geminiApiKey) &&
-      generatingSection === null &&
-      missingSections.length === 0,
-    [geminiApiKey, generatingSection, missingSections.length]
-  );
-
-  const commitPendingSkill = (snapshot: ResumeData): ResumeData => {
-    if (!pendingSkill.trim()) {
-      return snapshot;
-    }
-    const newSkills = [
-      ...snapshot.skills,
-      ...pendingSkill
-        .split(',')
-        .map((skill) => skill.trim())
-        .filter(Boolean),
-    ];
-    setPendingSkill('');
-    const uniqueSkills = Array.from(new Set(newSkills));
-    const updated = { ...snapshot, skills: uniqueSkills };
-    setResumeData(updated);
-    return updated;
-  };
+  const isPersonalInfoFilled = useMemo(() => {
+    const { name, email, phone, location } = resumeData.personalInfo;
+    return Boolean(name?.trim() && email?.trim() && phone?.trim() && location?.trim());
+  }, [resumeData.personalInfo]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
-
-    const loadGeminiKey = () => {
-      if (!user?.uid) {
-        setApiKeyWarning('Add your Gemini API key in the API Integration tab to use AI generation.');
+    const tryParseKeys = (storageKey: string) => {
+      const raw = localStorage.getItem(storageKey);
+      if (!raw) return null;
+      try {
+        const stored = JSON.parse(raw) as Array<{ service: string; key: string }>;
+        return stored.find(
+          (e) =>
+            e.service.toLowerCase().includes('gemini') || e.service.toLowerCase().includes('google')
+        )?.key ?? null;
+      } catch {
+        return null;
       }
-
-      const tryParseKeys = (storageKey: string) => {
-        const raw = localStorage.getItem(storageKey);
-        if (!raw) return null;
-        try {
-          const stored = JSON.parse(raw) as Array<{ service: string; key: string }>;
-          return (
-            stored.find((entry) =>
-              entry.service.toLowerCase().includes('gemini') ||
-              entry.service.toLowerCase().includes('google')
-            )?.key ?? null
-          );
-        } catch (error) {
-          console.error('Failed to parse API keys from storage key:', storageKey, error);
-          return null;
-        }
-      };
-
-      // Try user-specific key first
-      if (user?.uid) {
-        const key = tryParseKeys(`apiKeys_${user.uid}`);
-        if (key) {
-          setGeminiApiKey(key);
-          setApiKeyWarning(null);
+    };
+    if (user?.uid) {
+      const key = tryParseKeys(`apiKeys_${user.uid}`);
+      if (key) {
+        setGeminiApiKey(key);
+        return;
+      }
+    }
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key?.startsWith('apiKeys_')) {
+        const k = tryParseKeys(key);
+        if (k) {
+          setGeminiApiKey(k);
           return;
         }
       }
-
-      // Fallback: search all apiKeys_* entries
-      for (let i = 0; i < localStorage.length; i += 1) {
-        const storageKey = localStorage.key(i);
-        if (storageKey && storageKey.startsWith('apiKeys_')) {
-          const key = tryParseKeys(storageKey);
-          if (key) {
-            setGeminiApiKey(key);
-            setApiKeyWarning(null);
-            return;
-          }
-        }
-      }
-
-      setGeminiApiKey(null);
-      setApiKeyWarning('Gemini API key not found. Add a key (service name "Gemini" or "Google") in the API Integration tab to enable AI generation.');
-    };
-
-    loadGeminiKey();
-
-    const handleStorageChange = (event: StorageEvent) => {
-      if (event.key && event.key.startsWith('apiKeys_')) {
-        loadGeminiKey();
-      }
-    };
-    window.addEventListener('storage', handleStorageChange);
-    return () => window.removeEventListener('storage', handleStorageChange);
+    }
+    setGeminiApiKey(null);
   }, [user]);
 
+  const addEducation = () => {
+    setResumeData((prev) => ({
+      ...prev,
+      education: [...prev.education, initialEducation()],
+    }));
+  };
+
+  const addCertificate = () => {
+    setResumeData((prev) => ({
+      ...prev,
+      certificates: [...prev.certificates, initialCertificate()],
+    }));
+  };
+
+  const addExperience = () => {
+    setResumeData((prev) => ({
+      ...prev,
+      experience: [...prev.experience, initialExperience()],
+    }));
+  };
+
+  const removeExperience = (index: number) => {
+    setResumeData((prev) => ({
+      ...prev,
+      experience: prev.experience.filter((_, i) => i !== index),
+    }));
+  };
+
+  const removeEducation = (index: number) => {
+    setResumeData((prev) => ({
+      ...prev,
+      education: prev.education.filter((_, i) => i !== index),
+    }));
+  };
+
+  const removeCertificate = (index: number) => {
+    setResumeData((prev) => ({
+      ...prev,
+      certificates: prev.certificates.filter((_, i) => i !== index),
+    }));
+  };
+
+  const generateSummaryWithAI = async () => {
+    if (!geminiApiKey || !isPersonalInfoFilled) return;
+    setGeneratingSummary(true);
+    try {
+      const prompt = `Write a short professional summary (3–4 sentences) for a resume. Experience level: ${resumeData.experienceLevel}. Skills: ${resumeData.skills.join(', ') || 'Not specified'}. Return only the summary text, no labels or quotes.`;
+      const text = await generateGeminiResponse(prompt, undefined, undefined, geminiApiKey);
+      setResumeData((prev) => ({ ...prev, summary: text.trim() }));
+    } catch (e) {
+      console.error(e);
+      alert('Failed to generate summary. Check your Gemini API key in API Integration.');
+    } finally {
+      setGeneratingSummary(false);
+    }
+  };
+
   const extractJson = (raw: string) => {
-    const jsonMatch = raw.match(/```(?:json)?\s*([\s\S]*?)```/i);
-    if (jsonMatch) {
-      return jsonMatch[1].trim();
-    }
-    const firstBrace = raw.indexOf('{');
-    const lastBrace = raw.lastIndexOf('}');
-    if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
-      return raw.slice(firstBrace, lastBrace + 1);
-    }
+    const match = raw.match(/```(?:json)?\s*([\s\S]*?)```/i);
+    if (match) return match[1].trim();
+    const start = raw.indexOf('{');
+    const end = raw.lastIndexOf('}');
+    if (start !== -1 && end > start) return raw.slice(start, end + 1);
     return raw.trim();
   };
 
-  const generateWithAI = async (section: string) => {
-    if (!geminiApiKey) {
-      alert('Gemini API key not found. Add your Gemini API key (service: "Gemini" or "Google") in the API Integration tab to use AI generation.');
+  const generateResumeWithAI = async () => {
+    if (!geminiApiKey || !isPersonalInfoFilled) {
+      alert('Fill required personal information and add a Gemini API key in API Integration to enable AI generation.');
       return;
     }
-
-    setGeneratingSection(section);
+    setGeneratingResume(true);
     try {
-      const prompt = `Generate professional ${section} content for an ${experienceLevel === 'fresher' ? 'entry-level' : 'experienced'} AI/ML engineer resume. Return only the content, no explanations. Make it concise and impactful.`;
-      const content = await generateGeminiResponse(prompt, undefined, undefined, geminiApiKey);
-      
-      if (section === 'summary') {
-        setResumeData({ ...resumeData, summary: content });
+      let skills = resumeData.skills;
+      if (pendingSkill.trim()) {
+        skills = Array.from(new Set([...resumeData.skills, ...pendingSkill.split(',').map((s) => s.trim()).filter(Boolean)]));
+        setResumeData((prev) => ({ ...prev, skills }));
+        setPendingSkill('');
       }
-    } catch (error) {
-      console.error('AI generation error:', error);
-      const message = error instanceof Error ? error.message : 'Failed to generate content. Please check your Gemini API key.';
-      alert(message);
-    } finally {
-      setGeneratingSection((prev) => (prev === section ? null : prev));
-    }
-  };
 
-  const generateFullResume = async () => {
-    if (!geminiApiKey) {
-      alert('Gemini API key not found. Add your Gemini API key (service: "Gemini" or "Google") in the API Integration tab to use AI generation.');
-      return;
-    }
-    if (missingSections.length > 0) {
-      alert(`Please complete the following before generating the full resume: ${missingSections.join(', ')}.`);
-      return;
-    }
+      const prompt = `You are an expert resume writer. Generate a polished resume from this data. Return ONLY valid JSON (no markdown) with this shape:
+{ "summary": string, "skills": string[] }
 
-    const workingData = commitPendingSkill(resumeData);
+User data:
+- Personal: ${JSON.stringify(resumeData.personalInfo)}
+- Experience level: ${resumeData.experienceLevel}
+- Experience (roles): ${resumeData.experience.length ? JSON.stringify(resumeData.experience) : 'None'}
+- Current summary: ${resumeData.summary || '""'}
+- Skills: ${skills.length ? skills.join(', ') : 'None'}
+- Education: ${JSON.stringify(resumeData.education)}
+- Certificates: ${JSON.stringify(resumeData.certificates)}
 
-    setGeneratingSection('full');
-    try {
-      const prompt = `You are an expert AI resume writer. Using the following user-provided details, generate a polished ${experienceLevel === 'fresher' ? 'entry-level' : 'experienced'} AI/ML engineer resume.
-Return ONLY valid JSON matching this TypeScript interface:
-{
-  "summary": string,
-  "skills": string[],
-  "experience": Array<{ "title": string, "company": string, "duration": string, "description": string }>,
-  "education": Array<{ "degree": string, "institution": string, "year": string }>,
-  "projects": Array<{ "name": string, "description": string, "technologies": string[] }>
-}
-
-User data (fill in missing gaps, rewrite and enhance existing content where provided):
-Personal info: ${JSON.stringify(workingData.personalInfo, null, 2)}
-Current summary: ${workingData.summary || '""'}
-Skills: ${workingData.skills.length ? workingData.skills.join(', ') : 'None provided'}
-Experience entries: ${workingData.experience.length ? JSON.stringify(workingData.experience, null, 2) : 'None provided'}
-Education entries: ${workingData.education.length ? JSON.stringify(workingData.education, null, 2) : 'None provided'}
-Projects: ${workingData.projects.length ? JSON.stringify(workingData.projects, null, 2) : 'None provided'}
-
-Rules:
-- Tailor the content for AI/ML engineering roles.
-- Keep experience bullet descriptions concise but impactful.
-- For missing fields, craft realistic entries aligned with AI/ML skills.
-- Never include Markdown fencing or commentary—JSON only.`;
+Enhance summary and skills for a professional resume. Return only the JSON object.`;
 
       const raw = await generateGeminiResponse(prompt, undefined, undefined, geminiApiKey);
-      console.debug('[Resume Builder] Gemini raw response:', raw);
-      const jsonPayload = extractJson(raw);
-      console.debug('[Resume Builder] Extracted JSON payload:', jsonPayload);
-      let parsed: any;
-      try {
-        parsed = JSON.parse(jsonPayload);
-      } catch (parseError) {
-        console.error('Failed to parse Gemini JSON:', parseError);
-        alert('Gemini returned data in an unexpected format. Please try again.\n\nRaw response:\n' + raw);
-        return;
-      }
-
-      const normalisedProjects = Array.isArray(parsed.projects)
-        ? parsed.projects.map((proj: any) => ({
-            name: String(proj?.name ?? '').trim(),
-            description: String(proj?.description ?? '').trim(),
-            technologies: Array.isArray(proj?.technologies)
-              ? proj.technologies.filter((tech: any) => typeof tech === 'string' && tech.trim())
-              : typeof proj?.technologies === 'string'
-                ? proj.technologies
-                    .split(',')
-                    .map((tech: string) => tech.trim())
-                    .filter(Boolean)
-                : [],
-          }))
-        : null;
-
-      const normalisedExperience = Array.isArray(parsed.experience)
-        ? parsed.experience.map((exp: any) => ({
-            title: String(exp?.title ?? '').trim(),
-            company: String(exp?.company ?? '').trim(),
-            duration: String(exp?.duration ?? '').trim(),
-            description: String(exp?.description ?? '').trim(),
-          }))
-        : null;
-
-      const normalisedEducation = Array.isArray(parsed.education)
-        ? parsed.education.map((edu: any) => ({
-            degree: String(edu?.degree ?? '').trim(),
-            institution: String(edu?.institution ?? '').trim(),
-            year: String(edu?.year ?? '').trim(),
-          }))
-        : null;
-
-      const normalisedSkills = Array.isArray(parsed.skills)
-        ? parsed.skills.filter((skill: any) => typeof skill === 'string' && skill.trim())
-        : typeof parsed.skills === 'string'
-          ? parsed.skills
-              .split(',')
-              .map((skill: string) => skill.trim())
-              .filter(Boolean)
-          : null;
+      const jsonStr = extractJson(raw);
+      const parsed = JSON.parse(jsonStr) as { summary?: string; skills?: string[] };
 
       setResumeData((prev) => ({
         ...prev,
         summary: typeof parsed.summary === 'string' && parsed.summary.trim() ? parsed.summary.trim() : prev.summary,
-        skills: normalisedSkills && normalisedSkills.length > 0 ? normalisedSkills : prev.skills,
-        experience: normalisedExperience && normalisedExperience.length > 0 ? normalisedExperience : prev.experience,
-        education: normalisedEducation && normalisedEducation.length > 0 ? normalisedEducation : prev.education,
-        projects: normalisedProjects && normalisedProjects.length > 0 ? normalisedProjects : prev.projects,
+        skills: Array.isArray(parsed.skills) && parsed.skills.length > 0
+          ? parsed.skills.filter((s): s is string => typeof s === 'string' && Boolean(s.trim()))
+          : prev.skills,
       }));
-    } catch (error) {
-      console.error('Full resume generation failed:', error);
-      const message = error instanceof Error ? error.message : 'Failed to generate resume content. Please verify your Gemini API key and try again.';
-      alert(message);
+      setShowFullPageResume(true);
+    } catch (e) {
+      console.error(e);
+      alert('Failed to generate resume. Check your API key and try again.');
     } finally {
-      setGeneratingSection((prev) => (prev === 'full' ? null : prev));
+      setGeneratingResume(false);
     }
   };
+
+  const isFresherResume = ['Beginner', 'Intermediate', 'Advanced', 'Fresher'].includes(resumeData.experienceLevel);
+  const pageHeight = 297; // A4
+  const margin = 18;
+  const left = margin;
+  const w = 210 - margin * 2;
 
   const exportToPDF = async () => {
     const { default: jsPDF } = await import('jspdf');
     const doc = new jsPDF();
     const pageWidth = doc.internal.pageSize.getWidth();
     const centerX = pageWidth / 2;
-    let yPos = 25;
+    const maxY = pageHeight - 20;
+    let yPos = 22;
+
+    const checkNewPage = (needed: number) => {
+      if (!isFresherResume && yPos + needed > maxY) {
+        doc.addPage();
+        yPos = 22;
+      }
+    };
+
+    const sectionTitle = (title: string) => {
+      checkNewPage(14);
+      doc.setDrawColor(255, 107, 53);
+      doc.setLineWidth(0.5);
+      doc.line(left, yPos, left + 40, yPos);
+      doc.setFontSize(11);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(40, 40, 40);
+      doc.text(title, left, yPos + 5);
+      yPos += isFresherResume ? 8 : 10;
+    };
 
     // Header
-    doc.setFontSize(20);
+    doc.setFontSize(isFresherResume ? 16 : 18);
     doc.setFont('helvetica', 'bold');
-    doc.setTextColor(255, 107, 53);
+    doc.setTextColor(30, 30, 30);
     doc.text(resumeData.personalInfo.name || 'Your Name', centerX, yPos, { align: 'center' });
-    yPos += 10;
+    yPos += isFresherResume ? 5 : 7;
 
-    // Contact Info
-    doc.setFontSize(10);
+    doc.setFontSize(isFresherResume ? 9 : 10);
     doc.setFont('helvetica', 'normal');
-    doc.setTextColor(0, 0, 0);
-    const contactSegments = [
+    doc.setTextColor(80, 80, 80);
+    const contact = [
       resumeData.personalInfo.email,
       resumeData.personalInfo.phone,
       resumeData.personalInfo.location,
       resumeData.personalInfo.linkedin,
       resumeData.personalInfo.github,
     ].filter(Boolean);
-    if (contactSegments.length > 0) {
-      const contactInfo = contactSegments.join(' | ');
-      const contactLines = doc.splitTextToSize(contactInfo, 180);
+    if (contact.length) {
+      const contactStr = contact.join('  |  ');
+      const contactLines = doc.splitTextToSize(contactStr, w);
       contactLines.forEach((line: string) => {
         doc.text(line, centerX, yPos, { align: 'center' });
-        yPos += 6;
+        yPos += isFresherResume ? 4 : 5;
       });
-    } else {
-      yPos += 6;
+      yPos += isFresherResume ? 4 : 6;
     }
-    yPos += 6;
 
-    // Summary
+    doc.setTextColor(40, 40, 40);
+
     if (resumeData.summary) {
-      doc.setFontSize(14);
-      doc.setFont('helvetica', 'bold');
-      doc.text('Professional Summary', 20, yPos);
-      yPos += 8;
-      doc.setFontSize(10);
+      sectionTitle('PROFESSIONAL SUMMARY');
       doc.setFont('helvetica', 'normal');
-      const summaryLines = doc.splitTextToSize(resumeData.summary, 170);
-      doc.text(summaryLines, 20, yPos);
-      yPos += summaryLines.length * 5 + 10;
+      doc.setFontSize(isFresherResume ? 9 : 10);
+      const lines = doc.splitTextToSize(resumeData.summary, w);
+      lines.forEach((line: string) => {
+        checkNewPage(5);
+        doc.text(line, left, yPos);
+        yPos += isFresherResume ? 4 : 5;
+      });
+      yPos += isFresherResume ? 5 : 8;
     }
 
-    // Skills
-    if (resumeData.skills.length > 0) {
-      doc.setFontSize(14);
-      doc.setFont('helvetica', 'bold');
-      doc.text('Skills', 20, yPos);
-      yPos += 8;
-      doc.setFontSize(10);
-      doc.setFont('helvetica', 'normal');
-      doc.text(resumeData.skills.join(', '), 20, yPos);
-      yPos += 10;
-    }
+    sectionTitle('EXPERIENCE LEVEL');
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(isFresherResume ? 9 : 10);
+    doc.text(resumeData.experienceLevel, left, yPos);
+    yPos += isFresherResume ? 7 : 10;
 
-    // Experience
-    if (resumeData.experience.length > 0) {
-      doc.setFontSize(14);
-      doc.setFont('helvetica', 'bold');
-      doc.text('Experience', 20, yPos);
-      yPos += 8;
+    if (resumeData.experience.some((e) => e.title || e.company || e.duration || e.description)) {
+      sectionTitle('EXPERIENCE');
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(isFresherResume ? 9 : 10);
       resumeData.experience.forEach((exp) => {
-        doc.setFontSize(11);
+        if (!exp.title && !exp.company && !exp.duration && !exp.description) return;
+        checkNewPage(8);
         doc.setFont('helvetica', 'bold');
-        doc.text(exp.title, 20, yPos);
-        yPos += 6;
-        doc.setFontSize(10);
+        doc.text(exp.title || 'Role', left, yPos);
+        if (exp.duration) doc.text(exp.duration, left + w - doc.getTextWidth(exp.duration), yPos);
+        yPos += isFresherResume ? 4 : 5;
         doc.setFont('helvetica', 'normal');
-        doc.text(`${exp.company} | ${exp.duration}`, 20, yPos);
-        yPos += 6;
-        const descLines = doc.splitTextToSize(exp.description, 170);
-        doc.text(descLines, 20, yPos);
-        yPos += descLines.length * 5 + 5;
-      });
-    }
-
-    // Education
-    if (resumeData.education.length > 0) {
-      doc.setFontSize(14);
-      doc.setFont('helvetica', 'bold');
-      doc.text('Education', 20, yPos);
-      yPos += 8;
-      resumeData.education.forEach((edu) => {
-        doc.setFontSize(11);
-        doc.setFont('helvetica', 'bold');
-        doc.text(edu.degree, 20, yPos);
-        yPos += 6;
-        doc.setFontSize(10);
-        doc.setFont('helvetica', 'normal');
-        doc.text(`${edu.institution} | ${edu.year}`, 20, yPos);
-        yPos += 10;
-      });
-    }
-
-    // Projects
-    if (resumeData.projects.length > 0) {
-      doc.setFontSize(14);
-      doc.setFont('helvetica', 'bold');
-      doc.text('Projects', 20, yPos);
-      yPos += 8;
-      resumeData.projects.forEach((proj) => {
-        doc.setFontSize(11);
-        doc.setFont('helvetica', 'bold');
-        doc.text(proj.name, 20, yPos);
-        yPos += 6;
-        doc.setFontSize(10);
-        doc.setFont('helvetica', 'normal');
-        const descLines = doc.splitTextToSize(proj.description, 170);
-        doc.text(descLines, 20, yPos);
-        yPos += descLines.length * 5 + 5;
-        if (proj.technologies.length > 0) {
-          doc.text(`Technologies: ${proj.technologies.join(', ')}`, 20, yPos);
-          yPos += 6;
+        if (exp.company) {
+          checkNewPage(5);
+          doc.text(exp.company, left, yPos);
+          yPos += isFresherResume ? 4 : 5;
         }
-        yPos += 3;
+        if (exp.description) {
+          const descLines = doc.splitTextToSize(exp.description, w);
+          descLines.forEach((line: string) => {
+            checkNewPage(5);
+            doc.text(line, left, yPos);
+            yPos += isFresherResume ? 4 : 5;
+          });
+        }
+        yPos += isFresherResume ? 3 : 5;
+      });
+      yPos += isFresherResume ? 3 : 5;
+    }
+
+    if (resumeData.skills.length > 0) {
+      sectionTitle('SKILLS');
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(isFresherResume ? 9 : 10);
+      const skillList = resumeData.skills.filter((s) => s.trim());
+      const skillsPerLine = 3;
+      for (let i = 0; i < skillList.length; i += skillsPerLine) {
+        const lineSkills = skillList.slice(i, i + skillsPerLine).join(', ');
+        checkNewPage(5);
+        doc.text(`• ${lineSkills}`, left, yPos);
+        yPos += isFresherResume ? 4 : 5;
+      }
+      yPos += isFresherResume ? 5 : 8;
+    }
+
+    if (resumeData.education.some((e) => e.degree || e.institution || e.year)) {
+      sectionTitle('EDUCATION');
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(isFresherResume ? 9 : 10);
+      resumeData.education.forEach((edu) => {
+        if (edu.degree || edu.institution || edu.year) {
+          checkNewPage(6);
+          doc.text(`${edu.degree}${edu.institution ? `, ${edu.institution}` : ''}${edu.year ? ` • ${edu.year}` : ''}`, left, yPos);
+          yPos += isFresherResume ? 5 : 6;
+        }
+      });
+      yPos += isFresherResume ? 3 : 5;
+    }
+
+    if (resumeData.certificates.some((c) => c.name || c.issuer || c.year)) {
+      sectionTitle('CERTIFICATES');
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(isFresherResume ? 9 : 10);
+      resumeData.certificates.forEach((c) => {
+        if (c.name || c.issuer || c.year) {
+          checkNewPage(6);
+          doc.text(`${c.name}${c.issuer ? `, ${c.issuer}` : ''}${c.year ? ` • ${c.year}` : ''}`, left, yPos);
+          yPos += isFresherResume ? 5 : 6;
+        }
       });
     }
 
     doc.save('resume.pdf');
   };
 
-  const addExperience = () => {
-    setResumeData({
-      ...resumeData,
-      experience: [...resumeData.experience, { title: '', company: '', duration: '', description: '' }],
-    });
-  };
-
-  const addEducation = () => {
-    setResumeData({
-      ...resumeData,
-      education: [...resumeData.education, { degree: '', institution: '', year: '' }],
-    });
-  };
-
-  const addProject = () => {
-    setResumeData({
-      ...resumeData,
-      projects: [...resumeData.projects, { name: '', description: '', technologies: [] }],
-    });
-  };
-
-  return (
-    <DashboardLayout>
-      <div className="space-y-6">
-        <motion.div
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="mb-8"
-        >
-          <h1 className="text-title mb-2 flex items-center gap-3">
-            <UserRound className="w-8 h-8 text-primary" />
-            Resume Builder
-          </h1>
-          <p className="text-body">
-            Create a professional AI/ML engineer resume with AI assistance
-          </p>
-          {apiKeyWarning && (
-            <div className="mt-4 p-3 bg-yellow-500/15 border border-yellow-500/40 rounded-lg text-sm text-yellow-200">
-              {apiKeyWarning}
-            </div>
-          )}
-        </motion.div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Form */}
-          <div className="lg:col-span-2 space-y-6">
-            {/* Personal Info */}
-            <div className="bg-black modern-card glow-border p-6 rounded-xl relative">
-              <h2 className="text-section mb-4">Personal Information</h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 relative z-10">
-                {personalInfoFields.map((field) => (
-                  <div key={field.key} className="flex flex-col gap-2 relative z-10">
-                    <label className="text-caption text-textSecondary uppercase tracking-wide">
-                      {field.label}
-                      <span className="text-primary ml-1">*</span>
-                    </label>
-                    <input
-                      type={field.type ?? 'text'}
-                      placeholder={field.placeholder}
-                      value={resumeData.personalInfo[field.key] || ''}
-                      onChange={(e) =>
-                        setResumeData({
-                          ...resumeData,
-                          personalInfo: { ...resumeData.personalInfo, [field.key]: e.target.value },
-                        })
-                      }
-                      className="w-full px-4 py-2 bg-card text-text rounded-lg border border-transparent focus:border-primary focus:ring-2 focus:ring-primary/40 transition-all relative z-20"
-                      style={{ pointerEvents: 'auto' }}
-                    />
-                  </div>
-                ))}
-              </div>
-              {!isResumeReady && (
-                <p className="mt-4 text-caption text-yellow-400">
-                  Please fill in all personal information fields above to enable AI resume generation.
-                </p>
-              )}
-            </div>
-
-            {/* Summary */}
-            <div className="bg-black modern-card glow-border p-6 rounded-xl relative">
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-section">Professional Summary</h2>
+  // Full-page resume view (after generation)
+  if (showFullPageResume) {
+    return (
+      <DashboardLayout>
+        <div className="min-h-screen bg-[#0a0a0f] p-4 md:p-8">
+          <div className="mx-auto max-w-4xl">
+            <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
+              <button
+                onClick={() => setShowFullPageResume(false)}
+                className="flex items-center gap-2 rounded-lg border border-white/20 bg-white/5 px-4 py-2 text-sm text-white hover:bg-white/10"
+              >
+                <X className="h-4 w-4" /> Back to form
+              </button>
+              <div className="flex gap-3">
                 <button
-                  onClick={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    generateWithAI('summary');
-                  }}
-                  disabled={!geminiApiKey || generatingSection !== null}
-                  title={geminiApiKey ? undefined : 'Add your Gemini API key in API Integration to enable AI generation'}
-                  className={`px-4 py-2 rounded-lg transition-all flex items-center gap-2 relative z-20 cursor-pointer ${
-                    geminiApiKey
-                      ? 'bg-primary hover:bg-primary/90 text-white disabled:opacity-50'
-                      : 'bg-card text-text opacity-70 cursor-not-allowed'
-                  }`}
-                  type="button"
+                  onClick={exportToPDF}
+                  className="flex items-center gap-2 rounded-lg bg-[#ff6b35] px-4 py-2 text-sm font-medium text-white hover:bg-[#ff8c42]"
                 >
-                  <Sparkles className="w-4 h-4" />
-                  {generatingSection === 'summary' ? 'Generating...' : 'AI Generate'}
+                  <Download className="h-4 w-4" /> Download PDF
                 </button>
               </div>
+            </div>
+            <div className={`overflow-hidden rounded-xl bg-white shadow-2xl ${isFresherResume ? 'max-w-3xl mx-auto' : ''}`}>
+              <div className={`text-gray-900 ${isFresherResume ? 'p-6 md:p-10 max-h-[calc(100vh-12rem)]' : 'p-8 md:p-12'}`}>
+                <div className="border-b border-gray-200 pb-5 mb-5">
+                  <div className="flex items-start gap-4">
+                    <div className="h-1 w-12 flex-shrink-0 rounded bg-[#ff6b35] mt-2" aria-hidden />
+                    <div className="min-w-0 flex-1">
+                      <h1 className="text-2xl md:text-3xl font-bold text-gray-900 tracking-tight">
+                        {resumeData.personalInfo.name || 'Your Name'}
+                      </h1>
+                      <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-gray-600">
+                        {resumeData.personalInfo.email && <span>{resumeData.personalInfo.email}</span>}
+                        {resumeData.personalInfo.phone && <span className="text-gray-400">|</span>}
+                        {resumeData.personalInfo.phone && <span>{resumeData.personalInfo.phone}</span>}
+                        {resumeData.personalInfo.location && <span className="text-gray-400">|</span>}
+                        {resumeData.personalInfo.location && <span>{resumeData.personalInfo.location}</span>}
+                        {resumeData.personalInfo.linkedin && (
+                          <>
+                            <span className="text-gray-400">|</span>
+                            <a href={resumeData.personalInfo.linkedin} target="_blank" rel="noopener noreferrer" className="text-[#ff6b35] hover:underline">LinkedIn</a>
+                          </>
+                        )}
+                        {resumeData.personalInfo.github && (
+                          <>
+                            <span className="text-gray-400">|</span>
+                            <a href={resumeData.personalInfo.github} target="_blank" rel="noopener noreferrer" className="text-[#ff6b35] hover:underline">GitHub</a>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {resumeData.summary && (
+                  <section className={isFresherResume ? 'mb-4' : 'mb-5'}>
+                    <h2 className="text-xs font-bold uppercase tracking-widest text-[#ff6b35] mb-1.5">Professional Summary</h2>
+                    <p className="text-gray-700 leading-relaxed text-sm md:text-base">{resumeData.summary}</p>
+                  </section>
+                )}
+
+                <section className={isFresherResume ? 'mb-4' : 'mb-5'}>
+                  <h2 className="text-xs font-bold uppercase tracking-widest text-[#ff6b35] mb-1.5">Experience Level</h2>
+                  <p className="text-gray-800 font-medium">{resumeData.experienceLevel}</p>
+                </section>
+
+                {resumeData.experience.some((e) => e.title || e.company || e.duration || e.description) && (
+                  <section className={isFresherResume ? 'mb-4' : 'mb-5'}>
+                    <h2 className="text-xs font-bold uppercase tracking-widest text-[#ff6b35] mb-1.5">Experience</h2>
+                    <div className="space-y-4">
+                      {resumeData.experience.map((exp, i) => {
+                        if (!exp.title && !exp.company && !exp.duration && !exp.description) return null;
+                        return (
+                          <div key={i}>
+                            <div className="flex flex-wrap items-baseline justify-between gap-2">
+                              <span className="font-semibold text-gray-900">{exp.title || 'Role'}</span>
+                              {exp.duration && <span className="text-sm text-gray-600">{exp.duration}</span>}
+                            </div>
+                            {exp.company && <p className="text-sm text-gray-700 font-medium">{exp.company}</p>}
+                            {exp.description && (
+                              <p className="mt-1 text-sm text-gray-700 leading-relaxed whitespace-pre-line">{exp.description}</p>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </section>
+                )}
+
+                {resumeData.skills.length > 0 && (
+                  <section className={isFresherResume ? 'mb-4' : 'mb-5'}>
+                    <h2 className="text-xs font-bold uppercase tracking-widest text-[#ff6b35] mb-1.5">Skills</h2>
+                    <ul className="list-none space-y-1 pl-0">
+                      {(() => {
+                        const list = resumeData.skills.filter((s) => s.trim());
+                        const perLine = 3;
+                        const lines: string[][] = [];
+                        for (let i = 0; i < list.length; i += perLine) lines.push(list.slice(i, i + perLine));
+                        return lines.map((lineSkills, i) => (
+                          <li key={i} className="flex items-baseline gap-2 text-sm md:text-base text-gray-800">
+                            <span className="text-[#ff6b35] flex-shrink-0">•</span>
+                            <span>{lineSkills.join(', ')}</span>
+                          </li>
+                        ));
+                      })()}
+                    </ul>
+                  </section>
+                )}
+
+                {resumeData.education.some((e) => e.degree || e.institution || e.year) && (
+                  <section className={isFresherResume ? 'mb-4' : 'mb-5'}>
+                    <h2 className="text-xs font-bold uppercase tracking-widest text-[#ff6b35] mb-1.5">Education</h2>
+                    <ul className="space-y-1.5">
+                      {resumeData.education.map((edu, i) => {
+                        if (!edu.degree && !edu.institution && !edu.year) return null;
+                        return (
+                          <li key={i} className="text-gray-700 text-sm md:text-base">
+                            <span className="font-semibold text-gray-900">{edu.degree || '—'}</span>
+                            {edu.institution && <span>, {edu.institution}</span>}
+                            {edu.year && <span className="text-gray-600"> • {edu.year}</span>}
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  </section>
+                )}
+
+                {resumeData.certificates.some((c) => c.name || c.issuer || c.year) && (
+                  <section>
+                    <h2 className="text-xs font-bold uppercase tracking-widest text-[#ff6b35] mb-1.5">Certificates</h2>
+                    <ul className="space-y-1.5">
+                      {resumeData.certificates.map((c, i) => {
+                        if (!c.name && !c.issuer && !c.year) return null;
+                        return (
+                          <li key={i} className="text-gray-700 text-sm md:text-base">
+                            <span className="font-semibold text-gray-900">{c.name || '—'}</span>
+                            {c.issuer && <span>, {c.issuer}</span>}
+                            {c.year && <span className="text-gray-600"> • {c.year}</span>}
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  </section>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      </DashboardLayout>
+    );
+  }
+
+  // Main form view
+  return (
+    <DashboardLayout>
+      <div className="min-h-screen bg-[#0a0a0f] py-8 px-4 sm:px-6 lg:px-8">
+        <div className="mx-auto max-w-2xl">
+          <div className="mb-8 text-center">
+            <h1 className="text-2xl font-bold text-white flex items-center justify-center gap-2">
+              <UserRound className="h-8 w-8 text-[#ff6b35]" />
+              Resume Builder
+            </h1>
+            <p className="mt-2 text-sm text-white/70">
+              Fill the form below. Generate with AI then open your resume and download PDF.
+            </p>
+          </div>
+
+          <form
+            onSubmit={(e) => e.preventDefault()}
+            className="space-y-6 rounded-2xl border border-white/10 bg-black/40 p-6 shadow-xl backdrop-blur sm:p-8"
+          >
+            {/* Personal Information */}
+            <section>
+              <h2 className="text-lg font-semibold text-white mb-4">Personal Information</h2>
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div className="sm:col-span-2">
+                  <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-white/70">Full Name *</label>
+                  <input
+                    type="text"
+                    required
+                    value={resumeData.personalInfo.name}
+                    onChange={(e) =>
+                      setResumeData((prev) => ({
+                        ...prev,
+                        personalInfo: { ...prev.personalInfo, name: e.target.value },
+                      }))
+                    }
+                    className="w-full rounded-lg border border-white/20 bg-white/5 px-4 py-2.5 text-white placeholder:text-white/40 focus:border-[#ff6b35] focus:ring-1 focus:ring-[#ff6b35]"
+                    placeholder="Full Name"
+                  />
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-white/70">Email *</label>
+                  <input
+                    type="email"
+                    required
+                    value={resumeData.personalInfo.email}
+                    onChange={(e) =>
+                      setResumeData((prev) => ({
+                        ...prev,
+                        personalInfo: { ...prev.personalInfo, email: e.target.value },
+                      }))
+                    }
+                    className="w-full rounded-lg border border-white/20 bg-white/5 px-4 py-2.5 text-white placeholder:text-white/40 focus:border-[#ff6b35] focus:ring-1 focus:ring-[#ff6b35]"
+                    placeholder="Email"
+                  />
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-white/70">Phone *</label>
+                  <input
+                    type="tel"
+                    required
+                    value={resumeData.personalInfo.phone}
+                    onChange={(e) =>
+                      setResumeData((prev) => ({
+                        ...prev,
+                        personalInfo: { ...prev.personalInfo, phone: e.target.value },
+                      }))
+                    }
+                    className="w-full rounded-lg border border-white/20 bg-white/5 px-4 py-2.5 text-white placeholder:text-white/40 focus:border-[#ff6b35] focus:ring-1 focus:ring-[#ff6b35]"
+                    placeholder="Phone"
+                  />
+                </div>
+                <div className="sm:col-span-2">
+                  <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-white/70">Location *</label>
+                  <input
+                    type="text"
+                    required
+                    value={resumeData.personalInfo.location}
+                    onChange={(e) =>
+                      setResumeData((prev) => ({
+                        ...prev,
+                        personalInfo: { ...prev.personalInfo, location: e.target.value },
+                      }))
+                    }
+                    className="w-full rounded-lg border border-white/20 bg-white/5 px-4 py-2.5 text-white placeholder:text-white/40 focus:border-[#ff6b35] focus:ring-1 focus:ring-[#ff6b35]"
+                    placeholder="Location"
+                  />
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-white/70">LinkedIn URL (optional)</label>
+                  <input
+                    type="url"
+                    value={resumeData.personalInfo.linkedin}
+                    onChange={(e) =>
+                      setResumeData((prev) => ({
+                        ...prev,
+                        personalInfo: { ...prev.personalInfo, linkedin: e.target.value },
+                      }))
+                    }
+                    className="w-full rounded-lg border border-white/20 bg-white/5 px-4 py-2.5 text-white placeholder:text-white/40 focus:border-[#ff6b35] focus:ring-1 focus:ring-[#ff6b35]"
+                    placeholder="https://linkedin.com/in/..."
+                  />
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-white/70">GitHub URL (optional)</label>
+                  <input
+                    type="url"
+                    value={resumeData.personalInfo.github}
+                    onChange={(e) =>
+                      setResumeData((prev) => ({
+                        ...prev,
+                        personalInfo: { ...prev.personalInfo, github: e.target.value },
+                      }))
+                    }
+                    className="w-full rounded-lg border border-white/20 bg-white/5 px-4 py-2.5 text-white placeholder:text-white/40 focus:border-[#ff6b35] focus:ring-1 focus:ring-[#ff6b35]"
+                    placeholder="https://github.com/..."
+                  />
+                </div>
+              </div>
+              <p className="mt-3 text-xs text-amber-400/90">
+                Fill personal information fields above to enable AI resume generation.
+              </p>
+            </section>
+
+            {/* Professional Summary */}
+            <section>
+              <h2 className="text-lg font-semibold text-white mb-4">Professional Summary</h2>
               <textarea
                 value={resumeData.summary}
-                onChange={(e) => setResumeData({ ...resumeData, summary: e.target.value })}
-                placeholder="Write a professional summary or use AI to generate one"
-                className="w-full h-32 px-4 py-2 bg-card text-text rounded-lg relative z-10"
-                style={{ pointerEvents: 'auto' }}
+                onChange={(e) => setResumeData((prev) => ({ ...prev, summary: e.target.value }))}
+                rows={4}
+                className="w-full rounded-lg border border-white/20 bg-white/5 px-4 py-2.5 text-white placeholder:text-white/40 focus:border-[#ff6b35] focus:ring-1 focus:ring-[#ff6b35]"
+                placeholder="Write a professional summary or use AI to generate one."
               />
-            </div>
+              <div className="mt-2 flex justify-end">
+                <button
+                  type="button"
+                  disabled={!isPersonalInfoFilled || generatingSummary}
+                  onClick={generateSummaryWithAI}
+                  className="flex items-center gap-2 rounded-lg bg-[#ff6b35] px-4 py-2 text-sm font-medium text-white hover:bg-[#ff8c42] disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <Sparkles className="h-4 w-4" />
+                  {generatingSummary ? 'Generating…' : 'Generate with AI'}
+                </button>
+              </div>
+            </section>
 
             {/* Skills */}
-            <div className="bg-black modern-card glow-border p-6 rounded-xl relative">
-              <h2 className="text-section mb-4">Skills</h2>
-              <div className="flex flex-wrap gap-2 mb-4">
-                {resumeData.skills.map((skill, index) => (
+            <section>
+              <h2 className="text-lg font-semibold text-white mb-4">Skills</h2>
+              <div className="flex flex-wrap gap-2 mb-3">
+                {resumeData.skills.map((skill, i) => (
                   <span
-                    key={index}
-                    className="px-3 py-1 bg-primary/10 text-primary rounded-full text-caption flex items-center gap-2"
+                    key={i}
+                    className="inline-flex items-center gap-1 rounded-full bg-[#ff6b35]/20 px-3 py-1 text-sm text-[#ffb26b]"
                   >
                     {skill}
                     <button
-                      onClick={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        const newSkills = resumeData.skills.filter((_, i) => i !== index);
-                        setResumeData({ ...resumeData, skills: newSkills });
-                      }}
-                      className="hover:text-red-400 relative z-20 cursor-pointer"
                       type="button"
+                      onClick={() =>
+                        setResumeData((prev) => ({
+                          ...prev,
+                          skills: prev.skills.filter((_, idx) => idx !== i),
+                        }))
+                      }
+                      className="hover:text-red-400"
                     >
                       ×
                     </button>
@@ -627,419 +703,306 @@ Rules:
               </div>
               <input
                 type="text"
-                placeholder="Add skill and press Enter"
                 value={pendingSkill}
                 onChange={(e) => setPendingSkill(e.target.value)}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') {
                     e.preventDefault();
-                    const entries = pendingSkill
-                      .split(',')
-                      .map((item) => item.trim())
-                      .filter(Boolean);
-                    if (entries.length > 0) {
-                      const unique = Array.from(
-                        new Set([...resumeData.skills, ...entries])
-                      );
-                      setResumeData({ ...resumeData, skills: unique });
+                    const val = pendingSkill.trim();
+                    if (val) {
+                      setResumeData((prev) => ({
+                        ...prev,
+                        skills: Array.from(new Set([...prev.skills, ...val.split(',').map((s) => s.trim()).filter(Boolean)])),
+                      }));
                       setPendingSkill('');
                     }
                   }
                 }}
-                onBlur={() => {
-                  const trimmed = pendingSkill.trim();
-                  if (trimmed) {
-                    const entries = trimmed
-                      .split(',')
-                      .map((item) => item.trim())
-                      .filter(Boolean);
-                    if (entries.length > 0) {
-                      const unique = Array.from(
-                        new Set([...resumeData.skills, ...entries])
-                      );
-                      setResumeData({ ...resumeData, skills: unique });
-                    }
-                    setPendingSkill('');
-                  }
-                }}
-                className="w-full px-4 py-2 bg-card text-text rounded-lg border border-transparent focus:border-primary focus:ring-2 focus:ring-primary/40 transition-all relative z-10"
-                style={{ pointerEvents: 'auto' }}
+                className="w-full rounded-lg border border-white/20 bg-white/5 px-4 py-2.5 text-white placeholder:text-white/40 focus:border-[#ff6b35] focus:ring-1 focus:ring-[#ff6b35]"
+                placeholder="Add skills (e.g., Python, Machine Learning, React…). Press Enter to add."
               />
-            </div>
+            </section>
 
-            {/* Experience */}
-            <div className="bg-black modern-card glow-border p-6 rounded-xl relative">
+            {/* Experience Level */}
+            <section>
+              <h2 className="text-lg font-semibold text-white mb-4">Experience Level</h2>
+              <select
+                value={resumeData.experienceLevel}
+                onChange={(e) =>
+                  setResumeData((prev) => ({
+                    ...prev,
+                    experienceLevel: e.target.value as ExperienceLevel,
+                  }))
+                }
+                className="w-full rounded-lg border border-white/20 bg-white/5 px-4 py-2.5 text-white focus:border-[#ff6b35] focus:ring-1 focus:ring-[#ff6b35]"
+              >
+                {EXPERIENCE_LEVEL_OPTIONS.map((opt) => (
+                  <option key={opt} value={opt} className="bg-gray-900 text-white">
+                    {opt}
+                  </option>
+                ))}
+              </select>
+            </section>
+
+            {/* Detailed Experience */}
+            <section>
               <div className="flex items-center justify-between mb-4">
-                <h2 className="text-section">Experience</h2>
+                <h2 className="text-lg font-semibold text-white">Detailed experience</h2>
                 <button
-                  onClick={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    addExperience();
-                  }}
-                  className="px-4 py-2 bg-card hover:bg-card/80 text-text rounded-lg transition-all flex items-center gap-2 relative z-20 cursor-pointer"
                   type="button"
+                  onClick={addExperience}
+                  className="flex items-center gap-1 rounded-lg border border-white/20 bg-white/5 px-3 py-1.5 text-sm text-white hover:bg-white/10"
                 >
-                  <Plus className="w-4 h-4" />
-                  Add
+                  <Plus className="h-4 w-4" /> Add experience
                 </button>
               </div>
+              <p className="text-xs text-white/60 mb-3">Add roles and describe what you did in each.</p>
               <div className="space-y-4">
-              <div className="flex gap-2 items-center">
-                <span className="text-caption uppercase tracking-wide text-textSecondary">Experience Level:</span>
-                <div className="flex gap-2 relative z-10">
-                  <button
-                    onClick={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      setExperienceLevel('fresher');
-                    }}
-                    className={`px-3 py-1 rounded-lg text-caption transition-all relative z-20 cursor-pointer ${experienceLevel === 'fresher' ? 'bg-primary text-white' : 'bg-card text-text hover:bg-card/80'}`}
-                    type="button"
-                  >
-                    Fresher
-                  </button>
-                  <button
-                    onClick={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      setExperienceLevel('experienced');
-                    }}
-                    className={`px-3 py-1 rounded-lg text-caption transition-all relative z-20 cursor-pointer ${experienceLevel === 'experienced' ? 'bg-primary text-white' : 'bg-card text-text hover:bg-card/80'}`}
-                    type="button"
-                  >
-                    Experienced
-                  </button>
-                </div>
-              </div>
                 {resumeData.experience.map((exp, index) => (
-                  <div key={index} className="p-4 bg-card/50 rounded-lg space-y-3 relative">
-                    <div className="flex justify-end relative z-10">
+                  <div key={index} className="rounded-lg border border-white/10 bg-white/5 p-4">
+                    <div className="flex justify-end">
                       <button
-                        onClick={(e) => {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          const newExp = resumeData.experience.filter((_, i) => i !== index);
-                          setResumeData({ ...resumeData, experience: newExp });
-                        }}
-                        className="text-red-400 hover:text-red-500 relative z-20 cursor-pointer"
                         type="button"
+                        onClick={() => removeExperience(index)}
+                        className="text-red-400 hover:text-red-300"
                       >
-                        <Trash2 className="w-4 h-4" />
+                        <Trash2 className="h-4 w-4" />
                       </button>
                     </div>
-                    <input
-                      type="text"
-                      placeholder="Job Title"
-                      value={exp.title}
-                      onChange={(e) => {
-                        const newExp = [...resumeData.experience];
-                        newExp[index].title = e.target.value;
-                        setResumeData({ ...resumeData, experience: newExp });
-                      }}
-                      className="w-full px-3 py-2 bg-background text-text rounded relative z-10"
-                      style={{ pointerEvents: 'auto' }}
-                    />
-                    <div className="grid grid-cols-2 gap-3">
-                      <input
-                        type="text"
-                        placeholder="Company"
-                        value={exp.company}
-                        onChange={(e) => {
-                          const newExp = [...resumeData.experience];
-                          newExp[index].company = e.target.value;
-                          setResumeData({ ...resumeData, experience: newExp });
-                        }}
-                        className="w-full px-3 py-2 bg-background text-text rounded relative z-10"
-                        style={{ pointerEvents: 'auto' }}
-                      />
-                      <input
-                        type="text"
-                        placeholder="Duration (e.g., Jan 2020 - Dec 2022)"
-                        value={exp.duration}
-                        onChange={(e) => {
-                          const newExp = [...resumeData.experience];
-                          newExp[index].duration = e.target.value;
-                          setResumeData({ ...resumeData, experience: newExp });
-                        }}
-                        className="w-full px-3 py-2 bg-background text-text rounded relative z-10"
-                        style={{ pointerEvents: 'auto' }}
-                      />
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                      <div className="sm:col-span-2">
+                        <label className="mb-1 block text-xs text-white/70">Job title</label>
+                        <input
+                          type="text"
+                          value={exp.title}
+                          onChange={(e) => {
+                            const next = [...resumeData.experience];
+                            next[index].title = e.target.value;
+                            setResumeData((prev) => ({ ...prev, experience: next }));
+                          }}
+                          className="w-full rounded-lg border border-white/20 bg-white/5 px-3 py-2 text-white placeholder:text-white/40"
+                          placeholder="e.g. Software Engineer"
+                        />
+                      </div>
+                      <div>
+                        <label className="mb-1 block text-xs text-white/70">Company</label>
+                        <input
+                          type="text"
+                          value={exp.company}
+                          onChange={(e) => {
+                            const next = [...resumeData.experience];
+                            next[index].company = e.target.value;
+                            setResumeData((prev) => ({ ...prev, experience: next }));
+                          }}
+                          className="w-full rounded-lg border border-white/20 bg-white/5 px-3 py-2 text-white placeholder:text-white/40"
+                          placeholder="Company name"
+                        />
+                      </div>
+                      <div>
+                        <label className="mb-1 block text-xs text-white/70">Duration</label>
+                        <input
+                          type="text"
+                          value={exp.duration}
+                          onChange={(e) => {
+                            const next = [...resumeData.experience];
+                            next[index].duration = e.target.value;
+                            setResumeData((prev) => ({ ...prev, experience: next }));
+                          }}
+                          className="w-full rounded-lg border border-white/20 bg-white/5 px-3 py-2 text-white placeholder:text-white/40"
+                          placeholder="e.g. Jan 2022 – Present"
+                        />
+                      </div>
+                      <div className="sm:col-span-2">
+                        <label className="mb-1 block text-xs text-white/70">What you did (responsibilities, achievements)</label>
+                        <textarea
+                          value={exp.description}
+                          onChange={(e) => {
+                            const next = [...resumeData.experience];
+                            next[index].description = e.target.value;
+                            setResumeData((prev) => ({ ...prev, experience: next }));
+                          }}
+                          rows={3}
+                          className="w-full rounded-lg border border-white/20 bg-white/5 px-3 py-2 text-white placeholder:text-white/40"
+                          placeholder="Describe your role, key tasks, and outcomes..."
+                        />
+                      </div>
                     </div>
-                    <textarea
-                      placeholder="Job description"
-                      value={exp.description}
-                      onChange={(e) => {
-                        const newExp = [...resumeData.experience];
-                        newExp[index].description = e.target.value;
-                        setResumeData({ ...resumeData, experience: newExp });
-                      }}
-                      className="w-full px-3 py-2 bg-background text-text rounded h-24 relative z-10"
-                      style={{ pointerEvents: 'auto' }}
-                    />
                   </div>
                 ))}
               </div>
-            </div>
+            </section>
 
             {/* Education */}
-            <div className="bg-black modern-card glow-border p-6 rounded-xl relative">
+            <section>
               <div className="flex items-center justify-between mb-4">
-                <h2 className="text-section">Education</h2>
+                <h2 className="text-lg font-semibold text-white">Education</h2>
                 <button
-                  onClick={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    addEducation();
-                  }}
-                  className="px-4 py-2 bg-card hover:bg-card/80 text-text rounded-lg transition-all flex items-center gap-2 relative z-20 cursor-pointer"
                   type="button"
+                  onClick={addEducation}
+                  className="flex items-center gap-1 rounded-lg border border-white/20 bg-white/5 px-3 py-1.5 text-sm text-white hover:bg-white/10"
                 >
-                  <Plus className="w-4 h-4" />
-                  Add
+                  <Plus className="h-4 w-4" /> Add Education
                 </button>
               </div>
               <div className="space-y-4">
                 {resumeData.education.map((edu, index) => (
-                  <div key={index} className="p-4 bg-card/50 rounded-lg space-y-3 relative">
-                    <div className="flex justify-end relative z-10">
+                  <div key={index} className="rounded-lg border border-white/10 bg-white/5 p-4">
+                    <div className="flex justify-end">
                       <button
-                        onClick={(e) => {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          const newEdu = resumeData.education.filter((_, i) => i !== index);
-                          setResumeData({ ...resumeData, education: newEdu });
-                        }}
-                        className="text-red-400 hover:text-red-500 relative z-20 cursor-pointer"
                         type="button"
+                        onClick={() => removeEducation(index)}
+                        className="text-red-400 hover:text-red-300"
                       >
-                        <Trash2 className="w-4 h-4" />
+                        <Trash2 className="h-4 w-4" />
                       </button>
                     </div>
-                    <input
-                      type="text"
-                      placeholder="Degree"
-                      value={edu.degree}
-                      onChange={(e) => {
-                        const newEdu = [...resumeData.education];
-                        newEdu[index].degree = e.target.value;
-                        setResumeData({ ...resumeData, education: newEdu });
-                      }}
-                      className="w-full px-3 py-2 bg-background text-text rounded relative z-10"
-                      style={{ pointerEvents: 'auto' }}
-                    />
-                    <div className="grid grid-cols-2 gap-3">
-                      <input
-                        type="text"
-                        placeholder="Institution"
-                        value={edu.institution}
-                        onChange={(e) => {
-                          const newEdu = [...resumeData.education];
-                          newEdu[index].institution = e.target.value;
-                          setResumeData({ ...resumeData, education: newEdu });
-                        }}
-                        className="w-full px-3 py-2 bg-background text-text rounded relative z-10"
-                        style={{ pointerEvents: 'auto' }}
-                      />
-                      <input
-                        type="text"
-                        placeholder="Year"
-                        value={edu.year}
-                        onChange={(e) => {
-                          const newEdu = [...resumeData.education];
-                          newEdu[index].year = e.target.value;
-                          setResumeData({ ...resumeData, education: newEdu });
-                        }}
-                        className="w-full px-3 py-2 bg-background text-text rounded relative z-10"
-                        style={{ pointerEvents: 'auto' }}
-                      />
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                      <div>
+                        <label className="mb-1 block text-xs text-white/70">Degree</label>
+                        <input
+                          type="text"
+                          value={edu.degree}
+                          onChange={(e) => {
+                            const next = [...resumeData.education];
+                            next[index].degree = e.target.value;
+                            setResumeData((prev) => ({ ...prev, education: next }));
+                          }}
+                          className="w-full rounded-lg border border-white/20 bg-white/5 px-3 py-2 text-white placeholder:text-white/40"
+                          placeholder="e.g. B.Tech"
+                        />
+                      </div>
+                      <div>
+                        <label className="mb-1 block text-xs text-white/70">College / University</label>
+                        <input
+                          type="text"
+                          value={edu.institution}
+                          onChange={(e) => {
+                            const next = [...resumeData.education];
+                            next[index].institution = e.target.value;
+                            setResumeData((prev) => ({ ...prev, education: next }));
+                          }}
+                          className="w-full rounded-lg border border-white/20 bg-white/5 px-3 py-2 text-white placeholder:text-white/40"
+                          placeholder="Institution name"
+                        />
+                      </div>
+                      <div>
+                        <label className="mb-1 block text-xs text-white/70">Year</label>
+                        <input
+                          type="text"
+                          inputMode="numeric"
+                          value={edu.year}
+                          onChange={(e) => {
+                            const next = [...resumeData.education];
+                            next[index].year = e.target.value;
+                            setResumeData((prev) => ({ ...prev, education: next }));
+                          }}
+                          className="w-full rounded-lg border border-white/20 bg-white/5 px-3 py-2 text-white placeholder:text-white/40"
+                          placeholder="e.g. 2024"
+                        />
+                      </div>
                     </div>
                   </div>
                 ))}
               </div>
-            </div>
+            </section>
 
-            {/* Projects */}
-            <div className="bg-black modern-card glow-border p-6 rounded-xl relative">
+            {/* Certificates */}
+            <section>
               <div className="flex items-center justify-between mb-4">
-                <h2 className="text-section">Projects</h2>
+                <h2 className="text-lg font-semibold text-white">Certificates</h2>
                 <button
-                  onClick={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    addProject();
-                  }}
-                  className="px-4 py-2 bg-card hover:bg-card/80 text-text rounded-lg transition-all flex items-center gap-2 relative z-20 cursor-pointer"
                   type="button"
+                  onClick={addCertificate}
+                  className="flex items-center gap-1 rounded-lg border border-white/20 bg-white/5 px-3 py-1.5 text-sm text-white hover:bg-white/10"
                 >
-                  <Plus className="w-4 h-4" />
-                  Add
+                  <Plus className="h-4 w-4" /> Add Certificate
                 </button>
               </div>
               <div className="space-y-4">
-                {resumeData.projects.map((proj, index) => (
-                  <div key={index} className="p-4 bg-card/50 rounded-lg space-y-3 relative">
-                    <div className="flex justify-end relative z-10">
+                {resumeData.certificates.map((cert, index) => (
+                  <div key={index} className="rounded-lg border border-white/10 bg-white/5 p-4">
+                    <div className="flex justify-end">
                       <button
-                        onClick={(e) => {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          const newProj = resumeData.projects.filter((_, i) => i !== index);
-                          setResumeData({ ...resumeData, projects: newProj });
-                        }}
-                        className="text-red-400 hover:text-red-500 relative z-20 cursor-pointer"
                         type="button"
+                        onClick={() => removeCertificate(index)}
+                        className="text-red-400 hover:text-red-300"
                       >
-                        <Trash2 className="w-4 h-4" />
+                        <Trash2 className="h-4 w-4" />
                       </button>
                     </div>
-                    <input
-                      type="text"
-                      placeholder="Project Name"
-                      value={proj.name}
-                      onChange={(e) => {
-                        const newProj = [...resumeData.projects];
-                        newProj[index].name = e.target.value;
-                        setResumeData({ ...resumeData, projects: newProj });
-                      }}
-                      className="w-full px-3 py-2 bg-background text-text rounded relative z-10"
-                      style={{ pointerEvents: 'auto' }}
-                    />
-                    <textarea
-                      placeholder="Project description"
-                      value={proj.description}
-                      onChange={(e) => {
-                        const newProj = [...resumeData.projects];
-                        newProj[index].description = e.target.value;
-                        setResumeData({ ...resumeData, projects: newProj });
-                      }}
-                      className="w-full px-3 py-2 bg-background text-text rounded h-24 relative z-10"
-                      style={{ pointerEvents: 'auto' }}
-                    />
-                    <input
-                      type="text"
-                      placeholder="Technologies (comma separated)"
-                      onKeyPress={(e) => {
-                        if (e.key === 'Enter' && e.currentTarget.value) {
-                          const newProj = [...resumeData.projects];
-                          newProj[index].technologies = e.currentTarget.value.split(',').map(t => t.trim());
-                          setResumeData({ ...resumeData, projects: newProj });
-                          e.currentTarget.value = '';
-                        }
-                      }}
-                      className="w-full px-3 py-2 bg-background text-text rounded relative z-10"
-                      style={{ pointerEvents: 'auto' }}
-                    />
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                      <div>
+                        <label className="mb-1 block text-xs text-white/70">Certificate Name</label>
+                        <input
+                          type="text"
+                          value={cert.name}
+                          onChange={(e) => {
+                            const next = [...resumeData.certificates];
+                            next[index].name = e.target.value;
+                            setResumeData((prev) => ({ ...prev, certificates: next }));
+                          }}
+                          className="w-full rounded-lg border border-white/20 bg-white/5 px-3 py-2 text-white placeholder:text-white/40"
+                          placeholder="e.g. AWS Certified"
+                        />
+                      </div>
+                      <div>
+                        <label className="mb-1 block text-xs text-white/70">Issuer</label>
+                        <input
+                          type="text"
+                          value={cert.issuer}
+                          onChange={(e) => {
+                            const next = [...resumeData.certificates];
+                            next[index].issuer = e.target.value;
+                            setResumeData((prev) => ({ ...prev, certificates: next }));
+                          }}
+                          className="w-full rounded-lg border border-white/20 bg-white/5 px-3 py-2 text-white placeholder:text-white/40"
+                          placeholder="Issuing organization"
+                        />
+                      </div>
+                      <div>
+                        <label className="mb-1 block text-xs text-white/70">Year</label>
+                        <input
+                          type="text"
+                          inputMode="numeric"
+                          value={cert.year}
+                          onChange={(e) => {
+                            const next = [...resumeData.certificates];
+                            next[index].year = e.target.value;
+                            setResumeData((prev) => ({ ...prev, certificates: next }));
+                          }}
+                          className="w-full rounded-lg border border-white/20 bg-white/5 px-3 py-2 text-white placeholder:text-white/40"
+                          placeholder="e.g. 2024"
+                        />
+                      </div>
+                    </div>
                   </div>
                 ))}
               </div>
-            </div>
-          </div>
+            </section>
 
-          {/* AI Full Resume Generation */}
-          <div className="bg-black modern-card glow-border p-6 rounded-xl relative">
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <h2 className="text-section mb-2 flex items-center gap-2">
-                  <Bot className="w-5 h-5 text-primary" />
-                  AI Resume Draft
-                </h2>
-                <p className="text-body">
-                  Let Gemini craft a complete resume from your details. Review and tweak the generated content before exporting.
-                </p>
-              </div>
+            {/* Actions */}
+            <section className="flex flex-col gap-3 pt-4 sm:flex-row sm:justify-end">
               <button
-                onClick={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  generateFullResume();
-                }}
-                disabled={!canGenerateFullResume}
-                title={
-                  !geminiApiKey
-                    ? 'Add your Gemini API key in API Integration to enable AI generation'
-                    : missingSections.length > 0
-                    ? `Complete: ${missingSections.join(', ')}`
-                    : undefined
-                }
-                className={`px-4 py-2 rounded-lg transition-all flex items-center gap-2 relative z-20 cursor-pointer ${
-                  canGenerateFullResume
-                    ? 'bg-primary hover:bg-primary/90 text-white disabled:opacity-50'
-                    : 'bg-card text-text opacity-70 cursor-not-allowed'
-                }`}
                 type="button"
+                disabled={!isPersonalInfoFilled || generatingResume}
+                onClick={generateResumeWithAI}
+                className="flex items-center justify-center gap-2 rounded-lg bg-[#ff6b35] px-6 py-3 font-medium text-white hover:bg-[#ff8c42] disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                <Bot className="w-4 h-4" />
-                {generatingSection === 'full' ? 'Generating...' : 'Generate Full Resume'}
+                <Sparkles className="h-5 w-5" />
+                {generatingResume ? 'Generating…' : 'Generate Resume with AI'}
               </button>
-            </div>
-            {missingSections.length > 0 && (
-              <p className="mt-4 text-caption text-yellow-400">
-                Complete the following sections before generating: {missingSections.join(', ')}.
-              </p>
-            )}
-          </div>
-
-          {/* Preview & Actions */}
-          <div className="lg:col-span-1">
-            <div className="bg-black modern-card glow-border p-6 rounded-xl sticky top-4 relative">
-              <h2 className="text-section mb-4">Actions</h2>
-              <div className="space-y-3 relative z-10">
-                <button
-                  onClick={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    exportToPDF();
-                  }}
-                  className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-primary hover:bg-primary/90 text-white rounded-lg transition-all relative z-20 cursor-pointer"
-                  type="button"
-                >
-                  <Download className="w-5 h-5" />
-                  Export to PDF
-                </button>
-                <button
-                  onClick={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    localStorage.setItem('resumeData', JSON.stringify(resumeData));
-                    alert('Resume saved!');
-                  }}
-                  className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-card hover:bg-card/80 text-text rounded-lg transition-all relative z-20 cursor-pointer"
-                  type="button"
-                >
-                  <Save className="w-5 h-5" />
-                  Save Resume
-                </button>
-              </div>
-
-              <div className="mt-6 p-4 bg-card/50 rounded-lg relative z-10">
-                <h3 className="text-section mb-2">Templates</h3>
-                <div className="space-y-2">
-                  {['modern', 'classic', 'creative'].map((template) => (
-                    <button
-                      key={template}
-                      onClick={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        setSelectedTemplate(template);
-                      }}
-                      className={`w-full text-left px-3 py-2 rounded relative z-20 cursor-pointer ${
-                        selectedTemplate === template
-                          ? 'bg-primary text-white'
-                          : 'bg-card text-text hover:bg-card/80'
-                      }`}
-                      type="button"
-                    >
-                      {template.charAt(0).toUpperCase() + template.slice(1)}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </div>
-          </div>
+              <button
+                type="button"
+                onClick={exportToPDF}
+                className="flex items-center justify-center gap-2 rounded-lg border border-white/20 bg-white/5 px-6 py-3 font-medium text-white hover:bg-white/10"
+              >
+                <Download className="h-5 w-5" />
+                Download PDF
+              </button>
+            </section>
+          </form>
         </div>
       </div>
     </DashboardLayout>
   );
 }
-

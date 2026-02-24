@@ -57,6 +57,14 @@ export const projectService = {
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
     });
+    if (projectData.userId) {
+      try {
+        const { awardXP } = await import('@/lib/utils/gamification');
+        await awardXP(projectData.userId, 5, 'project_upload');
+      } catch (e) {
+        console.error('Failed to award XP for project upload:', e);
+      }
+    }
     return docRef.id;
   },
 

@@ -7,7 +7,6 @@ import { useAuth } from '@/contexts/AuthContext';
 import { motion } from 'framer-motion';
 import { Trophy, BookOpen, FlaskConical, TrendingUp, Sparkles, Target, ArrowLeft, Brain, Cpu, BookOpen as BookIcon } from 'lucide-react';
 import Link from 'next/link';
-import { useParams } from 'next/navigation';
 import ChartSkeleton from '@/components/dashboard/ChartSkeleton';
 import { learningProgressService } from '@/lib/services/learningProgressService';
 import { adminService } from '@/lib/services/adminService';
@@ -40,9 +39,8 @@ const getCourseIcon = (courseId: string): React.ComponentType<{ className?: stri
   return BookIcon;
 };
 
-export default function DashboardContent() {
-  const params = useParams();
-  const courseId = params.moduleId as string; // Using moduleId as courseId for backward compatibility
+export default function DashboardContent({ moduleId }: { moduleId: string }) {
+  const courseId = moduleId; // Using moduleId as courseId for backward compatibility
   const { user, firebaseUser } = useAuth();
   const [progressData, setProgressData] = useState<{ name: string; progress: number }[]>([]);
   const [completionData, setCompletionData] = useState<{ name: string; value: number; color: string }[]>([]);

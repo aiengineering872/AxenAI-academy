@@ -1,4 +1,4 @@
-import { doc, updateDoc, increment, getDoc } from 'firebase/firestore';
+import { doc, updateDoc, increment, getDoc, arrayUnion } from 'firebase/firestore';
 import { db } from '@/lib/firebase/config';
 
 export interface Badge {
@@ -77,6 +77,25 @@ export const checkBadgeUnlocks = async (userId: string, xp: number): Promise<voi
     }
   } catch (error) {
     console.error('Error checking badge unlocks:', error);
+  }
+};
+
+export const awardModuleCompletionXP = async (userId: string, courseId: string, moduleId: string): Promise<void> => {
+  try {
+    const moduleKey = `${courseId}_${moduleId}`;
+    const userRef = doc(db, 'users', userId);
+    const userSnap = await getDoc(userRef);
+    if (!userSnap.exists()) return;
+    const userData = userSnap.data();
+    const awarded = userData.modulesXPAwarded || [];
+    if (awarded.includes(moduleKey)) return;
+    await awardXP(userId, 1, 'module_complete');
+    await updateDoc(userRef, {
+      modulesXPAwarded: arrayUnion(moduleKey),
+      updatedAt: new Date(),
+    });
+  } catch (error) {
+    console.error('Error awarding module completion XP:', error);
   }
 };
 

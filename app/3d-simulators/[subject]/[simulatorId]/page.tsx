@@ -1,9 +1,10 @@
 'use client';
 
 import React from 'react';
+import { use } from 'react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Code, Brain, Network, Sparkles, ArrowLeft } from 'lucide-react';
-import { useRouter, useParams } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import dynamic from 'next/dynamic';
 
@@ -35,6 +36,10 @@ const RAGSimulator = dynamic(() => import('./RAGSimulator'), {
   ssr: false,
 });
 
+const LLMSimulator = dynamic(() => import('./LLMSimulator'), {
+  ssr: false,
+});
+
 const subjects = [
   { id: 'python', name: 'Python', icon: Code },
   { id: 'machine-learning', name: 'Machine Learning', icon: Brain },
@@ -42,13 +47,15 @@ const subjects = [
   { id: 'genai', name: 'GenAI', icon: Sparkles },
 ];
 
-export default function SimulatorPage() {
+export default function SimulatorPage({
+  params,
+}: {
+  params: Promise<{ subject?: string; simulatorId?: string }>;
+}) {
   const router = useRouter();
-  const params = useParams();
-  // Access params directly - useParams() in client components is synchronous
-  const subjectId = (params?.subject as string) || 'python';
-  const simulatorId = (params?.simulatorId as string) || '';
-  
+  const resolved = use(params);
+  const subjectId = (resolved?.subject as string) || 'python';
+  const simulatorId = (resolved?.simulatorId as string) || '';
   const currentSubject = subjects.find(s => s.id === subjectId) || subjects[0];
 
   return (
@@ -57,13 +64,32 @@ export default function SimulatorPage() {
         {/* Main Content Area - Full Width (No Sidebar) */}
         <div className="bg-black rounded-lg border border-primary/20 p-6 overflow-y-auto h-full">
           <div className="mb-4">
-            <Link 
-              href={`/3d-simulators/${subjectId}`}
-              className="inline-flex items-center gap-2 text-textSecondary hover:text-primary transition-colors"
-            >
-              <ArrowLeft className="w-4 h-4" />
-              <span>Back to {currentSubject.name} Simulators</span>
-            </Link>
+            {simulatorId === 'llm-simulator' ? (
+              <button
+                onClick={() => {
+                  if (typeof window !== 'undefined') {
+                    const returnUrl = sessionStorage.getItem('simulatorReturnUrl');
+                    if (returnUrl) {
+                      router.push(returnUrl);
+                    } else {
+                      router.back();
+                    }
+                  }
+                }}
+                className="inline-flex items-center gap-2 text-textSecondary hover:text-primary transition-colors"
+              >
+                <ArrowLeft className="w-4 h-4" />
+                <span>Back to Topic</span>
+              </button>
+            ) : (
+              <Link 
+                href={`/3d-simulators/${subjectId}`}
+                className="inline-flex items-center gap-2 text-textSecondary hover:text-primary transition-colors"
+              >
+                <ArrowLeft className="w-4 h-4" />
+                <span>Back to {currentSubject.name} Simulators</span>
+              </Link>
+            )}
           </div>
 
           <div className="flex items-center gap-3 mb-6">
@@ -74,6 +100,8 @@ export default function SimulatorPage() {
             <h1 className="text-2xl font-bold text-text">
               {simulatorId === 'ann'
                 ? 'ANN'
+                : simulatorId === 'llm-simulator'
+                ? 'LLM'
                 : simulatorId === 'prompt-engineering'
                 ? 'Prompt Engineering'
                 : simulatorId === 'rag-pipeline'
@@ -96,6 +124,8 @@ export default function SimulatorPage() {
               <PythonMemoryManagerSimulator />
             ) : subjectId === 'python' && (simulatorId === 'pandas-dataframe' || simulatorId === 'python-basics' || simulatorId === 'data-structures' || simulatorId === 'algorithms') ? (
               <PythonSimulator />
+            ) : subjectId === 'genai' && simulatorId === 'llm-simulator' ? (
+              <LLMSimulator />
             ) : subjectId === 'genai' && simulatorId === 'prompt-engineering' ? (
               <PromptEngineeringSimulator />
             ) : subjectId === 'genai' && simulatorId === 'rag-pipeline' ? (

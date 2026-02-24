@@ -63,7 +63,8 @@ export const learningProgressService = {
     courseId: string,
     moduleId: string,
     lessonId: string,
-    completed: boolean
+    completed: boolean,
+    totalLessonsInModule?: number
   ): Promise<void> {
     const storageKey = getStorageKey();
     if (!storageKey) return;
@@ -109,6 +110,21 @@ export const learningProgressService = {
         } catch (error) {
           console.error('Failed to save progress to Firebase:', error);
           // Continue with localStorage only
+        }
+      }
+
+      if (completed && auth?.currentUser) {
+        const moduleProgress = this.getModuleProgress(courseId, moduleId);
+        const isModuleComplete = totalLessonsInModule != null
+          ? moduleProgress.completedLessons >= totalLessonsInModule
+          : moduleProgress.progress === 100;
+        if (isModuleComplete) {
+          try {
+            const { awardModuleCompletionXP } = await import('@/lib/utils/gamification');
+            await awardModuleCompletionXP(auth.currentUser.uid, courseId, moduleId);
+          } catch (error) {
+            console.error('Failed to award module completion XP:', error);
+          }
         }
       }
     } catch (error) {

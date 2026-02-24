@@ -264,22 +264,26 @@ const HeroSection: React.FC<{ onEnroll: () => void }> = ({ onEnroll }) => (
             variants={fadeInUp}
             custom={0.5}
           >
-            <div className="relative h-64 w-full bg-gradient-to-br from-[#020617] via-[#020617] to-[#0b1220]">
-              <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_rgba(255,107,53,0.24),_transparent_55%)]" />
-              <div className="relative flex h-full w-full flex-col items-center justify-center gap-4 px-6 text-center">
+            <div className="relative w-full">
+              <div className="flex flex-col items-center gap-4 px-6 pt-6 pb-2 text-center">
                 <div className="inline-flex items-center gap-2 rounded-full bg-white/5 px-4 py-1 text-[10px] font-semibold uppercase tracking-[0.35em] text-white/60">
                   <span className="h-1.5 w-1.5 rounded-full bg-[#ff6b35]" />
-                  <span>App Intro</span>
+                  <span>APP INTRO</span>
                 </div>
-                <p className="max-w-sm text-sm text-white/75">
-                  Watch a quick introduction to see how Axen AI helps you become an industry-ready AI Engineer.
-                </p>
-                <button
-                  type="button"
-                  className="group inline-flex h-16 w-16 items-center justify-center rounded-full bg-white/5 text-white shadow-[0_0_30px_rgba(255,107,53,0.55)] ring-2 ring-white/25 transition-all duration-300 hover:scale-105 hover:bg-[#ff6b35] hover:text-[#05050a] hover:ring-[#ffcc99]"
-                >
-                  <span className="ml-1 inline-block border-l-[14px] border-l-current border-y-[9px] border-y-transparent transition-transform duration-300 group-hover:translate-x-[1px]" />
-                </button>
+              </div>
+              <div className="relative w-full px-6 pb-6">
+                <div className="aspect-video w-full overflow-hidden rounded-xl">
+                  <iframe
+                    width="560"
+                    height="315"
+                    src="https://www.youtube.com/embed/HaYpqofzmxc?rel=0&modestbranding=1&autoplay=0"
+                    title="YouTube video player"
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                    referrerPolicy="strict-origin-when-cross-origin"
+                    allowFullScreen
+                    className="h-full w-full"
+                  />
+                </div>
               </div>
             </div>
           </motion.div>

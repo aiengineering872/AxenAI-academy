@@ -22,6 +22,12 @@ const defaultForm = {
   pptTitle: '',
   pptUrl: '',
   googleColabUrl: '',
+  videoUrl: '',
+  videoUrls: {
+    english: '',
+    hindi: '',
+    telugu: '',
+  },
 };
 
 export const TopicModal: React.FC<TopicModalProps> = ({
@@ -54,6 +60,25 @@ export const TopicModal: React.FC<TopicModalProps> = ({
     }
 
     if (topic) {
+      // Handle backward compatibility: if videoUrl exists as string, convert to new format
+      let videoUrls = {
+        english: '',
+        hindi: '',
+        telugu: '',
+      };
+      
+      if (topic.videoUrls && typeof topic.videoUrls === 'object') {
+        // New format with multiple languages
+        videoUrls = {
+          english: topic.videoUrls.english || '',
+          hindi: topic.videoUrls.hindi || '',
+          telugu: topic.videoUrls.telugu || '',
+        };
+      } else if (topic.videoUrl && typeof topic.videoUrl === 'string' && topic.videoUrl.trim()) {
+        // Old format: single video URL, default to English
+        videoUrls.english = topic.videoUrl.trim();
+      }
+      
       setFormData({
         name: topic.name ?? '',
         content: topic.content ?? '',
@@ -61,6 +86,8 @@ export const TopicModal: React.FC<TopicModalProps> = ({
         pptTitle: topic.pptTitle ?? '',
         pptUrl: topic.pptUrl ?? '',
         googleColabUrl: topic.googleColabUrl ?? '',
+        videoUrl: topic.videoUrl ?? '', // Keep for backward compatibility
+        videoUrls: videoUrls,
       });
       // If topic has a PPT URL, show it as uploaded
       if (topic.pptUrl) {
@@ -185,6 +212,11 @@ export const TopicModal: React.FC<TopicModalProps> = ({
                     pptUrl: formData.pptUrl,
                     // CRITICAL: Preserve googleColabUrl - use formData if provided, otherwise keep existing
                     googleColabUrl: formData.googleColabUrl || t.googleColabUrl || '',
+                    videoUrl: formData.videoUrl || formData.videoUrls?.english || t.videoUrl || '', // Keep for backward compatibility
+                    // Preserve videoUrls - merge with existing if available, otherwise use formData
+                    videoUrls: formData.videoUrls && (formData.videoUrls.english || formData.videoUrls.hindi || formData.videoUrls.telugu)
+                      ? formData.videoUrls
+                      : (t.videoUrls || (t.videoUrl ? { english: t.videoUrl, hindi: '', telugu: '' } : { english: '', hindi: '', telugu: '' })),
                   }
                 : {
                     // Preserve all topic fields - never remove googleColabUrl
@@ -195,6 +227,9 @@ export const TopicModal: React.FC<TopicModalProps> = ({
                     pptTitle: t.pptTitle || '',
                     pptUrl: t.pptUrl || '',
                     googleColabUrl: t.googleColabUrl || '',
+                    videoUrl: t.videoUrl || '',
+                    // Only include videoUrls if it exists (don't set undefined)
+                    ...(t.videoUrls ? { videoUrls: t.videoUrls } : {}),
                   }
             );
           } else {
@@ -207,6 +242,11 @@ export const TopicModal: React.FC<TopicModalProps> = ({
               pptTitle: formData.pptTitle,
               pptUrl: formData.pptUrl,
               googleColabUrl: formData.googleColabUrl,
+              videoUrl: formData.videoUrl || formData.videoUrls?.english || '',
+              // Only include videoUrls if at least one language has a URL (don't set undefined)
+              ...((formData.videoUrls && (formData.videoUrls.english || formData.videoUrls.hindi || formData.videoUrls.telugu))
+                ? { videoUrls: formData.videoUrls }
+                : {}),
             };
             updatedTopics = [...topics, newTopic];
           }
@@ -226,7 +266,7 @@ export const TopicModal: React.FC<TopicModalProps> = ({
           number: m.number || String(index + 1),
           name: m.name || '',
           order: m.order ?? index,
-          topics: Array.isArray(m.topics)
+            topics: Array.isArray(m.topics)
             ? m.topics.map((t: any, tIndex: number) => ({
                 id: t.id || `topic-${index}-${tIndex}`,
                 name: t.name || '',
@@ -235,6 +275,7 @@ export const TopicModal: React.FC<TopicModalProps> = ({
                 pptTitle: t.pptTitle || '',
                 pptUrl: t.pptUrl || '',
                 googleColabUrl: t.googleColabUrl || '',
+                videoUrl: t.videoUrl || '',
               }))
             : [],
         };
@@ -472,6 +513,81 @@ export const TopicModal: React.FC<TopicModalProps> = ({
                 )}
               </div>
             </div>
+          </div>
+
+          <div className="space-y-4">
+            <label className="mb-2 block text-sm font-medium text-textSecondary">
+              Video Links (Multiple Languages)
+            </label>
+            
+            <div>
+              <label className="mb-2 block text-xs font-medium text-textSecondary">
+                English Video Link (Default)
+              </label>
+              <input
+                type="url"
+                value={formData.videoUrls.english}
+                onChange={(event) => {
+                  setFormData((prev) => ({
+                    ...prev,
+                    videoUrls: {
+                      ...prev.videoUrls,
+                      english: event.target.value,
+                    },
+                    // Keep backward compatibility
+                    videoUrl: event.target.value,
+                  }));
+                }}
+                className="w-full rounded-lg border border-card bg-card px-4 py-3 text-text focus:outline-none focus:ring-2 focus:ring-primary"
+                placeholder="https://youtube.com/watch?v=... or direct video URL"
+              />
+            </div>
+            
+            <div>
+              <label className="mb-2 block text-xs font-medium text-textSecondary">
+                Hindi/Urdu Video Link (हिंदी/اردو)
+              </label>
+              <input
+                type="url"
+                value={formData.videoUrls.hindi}
+                onChange={(event) => {
+                  setFormData((prev) => ({
+                    ...prev,
+                    videoUrls: {
+                      ...prev.videoUrls,
+                      hindi: event.target.value,
+                    },
+                  }));
+                }}
+                className="w-full rounded-lg border border-card bg-card px-4 py-3 text-text focus:outline-none focus:ring-2 focus:ring-primary"
+                placeholder="https://youtube.com/watch?v=... or direct video URL"
+              />
+            </div>
+            
+            <div>
+              <label className="mb-2 block text-xs font-medium text-textSecondary">
+                Telugu Video Link (తెలుగు)
+              </label>
+              <input
+                type="url"
+                value={formData.videoUrls.telugu}
+                onChange={(event) => {
+                  setFormData((prev) => ({
+                    ...prev,
+                    videoUrls: {
+                      ...prev.videoUrls,
+                      telugu: event.target.value,
+                    },
+                  }));
+                }}
+                className="w-full rounded-lg border border-card bg-card px-4 py-3 text-text focus:outline-none focus:ring-2 focus:ring-primary"
+                placeholder="https://youtube.com/watch?v=... or direct video URL"
+              />
+            </div>
+            
+            <p className="mt-1 text-xs text-textSecondary">
+              Provide video links for different languages (YouTube, Vimeo, or direct video file URL). English is shown by default.
+            </p>
           </div>
 
           <div>

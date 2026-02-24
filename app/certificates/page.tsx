@@ -28,14 +28,14 @@ export default function CertificatesPage() {
     setCertificates([
       {
         id: '1',
-        courseName: 'AI Engineering Fundamentals',
+        courseName: 'Applied AI Engineer',
         completionDate: '2024-01-15',
         certificateId: 'AXEN-AI-ENG-2024-001',
         shareableLink: 'https://axen.app/cert/abc123',
       },
       {
         id: '2',
-        courseName: 'Machine Learning Mastery',
+        courseName: 'AIML Engineer',
         completionDate: '2024-02-20',
         certificateId: 'AXEN-ML-2024-002',
         shareableLink: 'https://axen.app/cert/def456',
@@ -48,54 +48,157 @@ export default function CertificatesPage() {
     const doc = new jsPDF('landscape', 'mm', 'a4');
     const width = doc.internal.pageSize.getWidth();
     const height = doc.internal.pageSize.getHeight();
+    const cx = width / 2;
 
     // Background
     doc.setFillColor(10, 17, 40);
     doc.rect(0, 0, width, height, 'F');
 
-    // Border
+    // Outer decorative border (gold/orange)
     doc.setDrawColor(255, 107, 53);
+    doc.setLineWidth(0.5);
+    doc.rect(8, 8, width - 16, height - 16);
     doc.setLineWidth(2);
-    doc.rect(10, 10, width - 20, height - 20);
+    doc.rect(12, 12, width - 24, height - 24);
+
+    // Inner border
+    doc.setDrawColor(255, 140, 66);
+    doc.setLineWidth(0.3);
+    doc.rect(18, 18, width - 36, height - 36);
+
+    // Corner ornaments (L-shaped accents)
+    const cornerSize = 12;
+    [[18, 18], [width - 18, 18], [width - 18, height - 18], [18, height - 18]].forEach(([x, y], i) => {
+      doc.setDrawColor(255, 107, 53);
+      doc.setLineWidth(1);
+      const dx = i === 0 || i === 3 ? 1 : -1;
+      const dy = i === 0 || i === 1 ? 1 : -1;
+      doc.line(x, y, x + dx * cornerSize, y);
+      doc.line(x, y, x, y + dy * cornerSize);
+    });
+
+    // Decorative seal/badge (left side)
+    const sealX = 45;
+    const sealY = height / 2 - 8;
+    doc.setDrawColor(255, 107, 53);
+    doc.setFillColor(40, 30, 20);
+    doc.setLineWidth(1.5);
+    doc.circle(sealX, sealY, 18, 'FD');
+    doc.setDrawColor(255, 140, 66);
+    doc.circle(sealX, sealY, 14, 'S');
+    doc.setTextColor(255, 107, 53);
+    doc.setFontSize(14);
+    doc.setFont('helvetica', 'bold');
+    doc.text('AXEN', sealX, sealY - 2, { align: 'center' });
+    doc.setFontSize(8);
+    doc.setFont('helvetica', 'normal');
+    doc.text('AI ACADEMY', sealX, sealY + 4, { align: 'center' });
+
+    // Decorative seal/badge (right side)
+    const sealX2 = width - 45;
+    doc.setDrawColor(255, 107, 53);
+    doc.setFillColor(40, 30, 20);
+    doc.setLineWidth(1.5);
+    doc.circle(sealX2, sealY, 18, 'FD');
+    doc.setDrawColor(255, 140, 66);
+    doc.circle(sealX2, sealY, 14, 'S');
+    doc.setTextColor(255, 107, 53);
+    doc.setFontSize(14);
+    doc.setFont('helvetica', 'bold');
+    doc.text('CERTIFIED', sealX2, sealY - 2, { align: 'center' });
+    doc.setFontSize(8);
+    doc.setFont('helvetica', 'normal');
+    doc.text('COMPLETION', sealX2, sealY + 4, { align: 'center' });
+
+    // Top decorative line
+    doc.setDrawColor(200, 100, 60);
+    doc.setLineWidth(0.5);
+    doc.line(cx - 60, 42, cx + 60, 42);
+
+    // Issuing authority
+    doc.setTextColor(255, 140, 66);
+    doc.setFontSize(11);
+    doc.setFont('helvetica', 'normal');
+    doc.text('AXEN AI ACADEMY', cx, 35, { align: 'center' });
 
     // Title
     doc.setTextColor(255, 107, 53);
-    doc.setFontSize(32);
+    doc.setFontSize(28);
     doc.setFont('helvetica', 'bold');
-    doc.text('CERTIFICATE OF COMPLETION', width / 2, 50, { align: 'center' });
+    doc.text('CERTIFICATE OF COMPLETION', cx, 55, { align: 'center' });
+
+    // Bottom decorative line under title
+    doc.setDrawColor(220, 120, 70);
+    doc.line(cx - 50, 62, cx + 50, 62);
 
     // Subtitle
-    doc.setTextColor(255, 255, 255);
-    doc.setFontSize(16);
+    doc.setTextColor(200, 210, 230);
+    doc.setFontSize(12);
     doc.setFont('helvetica', 'normal');
-    doc.text('This is to certify that', width / 2, 70, { align: 'center' });
+    doc.text('This is to certify that', cx, 82, { align: 'center' });
 
-    // Name
-    doc.setFontSize(24);
+    // Recipient name
+    doc.setFontSize(22);
     doc.setFont('helvetica', 'bold');
     doc.setTextColor(255, 107, 53);
-    doc.text(user?.displayName || 'Student', width / 2, 90, { align: 'center' });
+    const recipientName = user?.displayName || 'Student';
+    doc.text(recipientName, cx, 98, { align: 'center' });
 
-    // Course
-    doc.setFontSize(16);
+    // Course intro
+    doc.setFontSize(11);
     doc.setFont('helvetica', 'normal');
-    doc.setTextColor(255, 255, 255);
-    doc.text(`has successfully completed the course`, width / 2, 110, { align: 'center' });
+    doc.setTextColor(200, 210, 230);
+    doc.text('has successfully completed the course', cx, 112, { align: 'center' });
 
+    // Course name (prominent)
     doc.setFontSize(20);
     doc.setFont('helvetica', 'bold');
-    doc.setTextColor(255, 107, 53);
-    doc.text(certificate.courseName, width / 2, 130, { align: 'center' });
+    doc.setTextColor(255, 140, 66);
+    doc.text(certificate.courseName, cx, 130, { align: 'center' });
 
-    // Date
-    doc.setFontSize(14);
+    // Decorative line
+    doc.setDrawColor(180, 90, 55);
+    doc.line(cx - 40, 138, cx + 40, 138);
+
+    // Date and ID box
+    doc.setFillColor(30, 25, 20);
+    doc.roundedRect(cx - 50, 148, 100, 20, 2, 2, 'FD');
+    doc.setDrawColor(220, 120, 70);
+    doc.roundedRect(cx - 50, 148, 100, 20, 2, 2, 'S');
+    doc.setFontSize(11);
     doc.setFont('helvetica', 'normal');
-    doc.setTextColor(160, 174, 192);
-    doc.text(`Date: ${new Date(certificate.completionDate).toLocaleDateString()}`, width / 2, 160, { align: 'center' });
+    doc.setTextColor(180, 190, 210);
+    doc.text(`Date: ${new Date(certificate.completionDate).toLocaleDateString()}`, cx, 157, { align: 'center' });
+    doc.setFontSize(10);
+    doc.text(`Certificate ID: ${certificate.certificateId}`, cx, 164, { align: 'center' });
 
-    // Certificate ID
-    doc.setFontSize(12);
-    doc.text(`Certificate ID: ${certificate.certificateId}`, width / 2, 175, { align: 'center' });
+    // Signature block
+    doc.setDrawColor(200, 100, 60);
+    doc.setLineWidth(0.5);
+    doc.line(cx - 55, height - 38, cx - 25, height - 38);
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(255, 140, 66);
+    doc.text('Authorized Signature', cx - 40, height - 32, { align: 'center' });
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8);
+    doc.setTextColor(160, 170, 190);
+    doc.text('Chief Learning Officer', cx - 40, height - 27, { align: 'center' });
+
+    doc.line(cx + 25, height - 38, cx + 55, height - 38);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(9);
+    doc.setTextColor(255, 140, 66);
+    doc.text('Authorized Signature', cx + 40, height - 32, { align: 'center' });
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8);
+    doc.setTextColor(160, 170, 190);
+    doc.text('Director, Axen AI Academy', cx + 40, height - 27, { align: 'center' });
+
+    // Footer
+    doc.setFontSize(8);
+    doc.setTextColor(120, 130, 150);
+    doc.text('This certificate verifies successful course completion. Verify at axenai.in', cx, height - 12, { align: 'center' });
 
     // Save
     doc.save(`certificate-${certificate.certificateId}.pdf`);
